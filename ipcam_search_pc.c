@@ -9,15 +9,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "ipcam_message.h"
-
-#define DEBUG_PRINT         1
-#define debug_print(fmt, ...) \
-    do { \
-        if (DEBUG_PRINT) \
-            fprintf(stderr, "debug_print: %s: %d: %s():" \
-                    fmt "\n", __FILE__, __LINE__, __func__, \
-                    ##__VA_ARGS__); \
-    } while (0)
+#include "ipcam_list.h"
+#include "debug_print.h"
 
 #ifndef LINE_MAX
 #define LINE_MAX            2048
@@ -27,13 +20,17 @@
 #define IPCAM_SERVER_PORT   6755
 #define PC_SERVER_PORT      6756
 
+static ipcam_link IPCAM_DEV;
+
+void list_ipcam(ipcam_link ipcam_dev);
 int run_cmd_by_string(char *cmd_string);
 static char *get_line(char *s, size_t n, FILE *f);
 void ctrl_c(int signo);
 void deal_console_input_sig_init(void);
 void release_exit(int signo);
 void *deal_console_input(void *p);
-void *deal_msg_func(void *p);
+void *recv_msg_from_ipcam(void *p);
+void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
 int parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg);
 #if 0
 struct ipcam_search_msg {
@@ -61,10 +58,31 @@ enum {
 } ipcam_search_msg_type;
 #endif
 
+void list_ipcam(ipcam_link ipcam_dev)
+{
+    pipcam_node q = ipcam_dev->next;
+
+    while (q) {
+        debug_print("ipcam_name is %s", q->node_info.ipcam_name);
+        q = q->next;
+    }
+
+    return;
+}
+
 int run_cmd_by_string(char *cmd_string)
 {
     int ret = -1;
+
     debug_print("cmd is %s", cmd_string);
+    switch (cmd_string[0]) {
+    case 'l':   /* test */
+        list_ipcam(IPCAM_DEV);
+        break;
+    default:
+        break;
+    } /* switch (cmd_string[0]) */
+
     return ret;
 }
 
@@ -92,6 +110,7 @@ void release_exit(int signo)
     /*
      * release resources
      */
+    free_ipcam_link(IPCAM_DEV);
 
     /*
      * exit
@@ -145,26 +164,71 @@ int parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg)
     save_msg->ssrc = ((struct ipcam_search_msg *)msg)->ssrc;
     save_msg->timestamp = ((struct ipcam_search_msg *)msg)->timestamp;
     save_msg->heartbeat_num = ((struct ipcam_search_msg *)msg)->heartbeat_num;
-    strncpy(save_msg->ipcam_name, 
+    memcpy(save_msg->ipcam_name, 
             ((struct ipcam_search_msg *)msg)->ipcam_name, 
             sizeof(save_msg->ipcam_name));
     if (exten_len) {
-        strncpy(save_msg->exten_msg, 
-                ((struct ipcam_search_msg *)msg)->exten_msg, 
-                sizeof(save_msg->exten_msg));
+        memcpy(save_msg->exten_msg, 
+               ((struct ipcam_search_msg *)msg)->exten_msg, 
+               exten_len);
     }
 
     return 0;
 }
 
-void *deal_msg_func(void *p)
+void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from)
+{
+    ipcam_info_t remote_ipcam_info;
+    struct ipcam_node new_ipcam_node;
+
+    switch (msg->type) {
+    case IPCAMMSG_LOGIN:
+        debug_print("new ipcam login");
+        memset(&remote_ipcam_info, 0, sizeof(remote_ipcam_info));
+        memcpy(&remote_ipcam_info.ipaddr, &from->sin_addr, 
+               (size_t)sizeof(struct in_addr));
+        memcpy(remote_ipcam_info.mac, msg->exten_msg, msg->exten_len);
+        memcpy(remote_ipcam_info.ipcam_name, msg->ipcam_name, 
+                (size_t)sizeof(remote_ipcam_info.ipcam_name));
+        debug_print("ipaddr is %s", inet_ntoa(remote_ipcam_info.ipaddr));
+        debug_print("mac is %02x:%02x:%02x:%02x:%02x:%02x\n", 
+            remote_ipcam_info.mac[0],
+            remote_ipcam_info.mac[1],
+            remote_ipcam_info.mac[2],
+            remote_ipcam_info.mac[3],
+            remote_ipcam_info.mac[4],
+            remote_ipcam_info.mac[5]);
+        debug_print("ipcam_name is %s", remote_ipcam_info.ipcam_name);
+        memset(&new_ipcam_node, 0, sizeof(new_ipcam_node));
+        new_ipcam_node.node_info = remote_ipcam_info;
+        new_ipcam_node.alive_flag = 1;
+        insert_ipcam_node(IPCAM_DEV, &new_ipcam_node);
+        break;
+    case IPCAMMSG_LOGOUT:
+        break;
+    case IPCAMMSG_HEARTBEAT:
+        break;
+    case IPCAMMSG_ACK_ALIVE:
+        break;
+    case IPCAMMSG_ACK_DHCP:
+        break;
+    case IPCAMMSG_ACK_IP:
+        break;
+    default:
+        debug_print("type is  %d ", msg->type);
+    } /* switch (msg->type) */
+
+    return;
+}
+
+void *recv_msg_from_ipcam(void *p)
 {
     int pc_server_fd;
     struct sockaddr_in pc_server;
     struct sockaddr_in peer;
     char buf[MAX_MSG_LEN];
     struct ipcam_search_msg *msg_buf;
-    int len;
+    socklen_t len;
     int ret;
 
     pc_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -185,6 +249,7 @@ void *deal_msg_func(void *p)
     }
 
     while (1) {
+        len = sizeof(struct sockaddr_in);
         ret = recvfrom(pc_server_fd, buf, sizeof(buf), 0, 
                        (struct sockaddr *)&peer, 
                        (socklen_t *)&len);
@@ -195,7 +260,8 @@ void *deal_msg_func(void *p)
         msg_buf = malloc(sizeof(struct ipcam_search_msg) 
                          + ((struct ipcam_search_msg *)buf)->exten_len);
         parse_msg(buf, ret, msg_buf);
-        debug_print("msg from %s", msg_buf->ipcam_name);
+
+        deal_msg_func(msg_buf, &peer);
 
         if (msg_buf) {
             free(msg_buf);
@@ -204,7 +270,7 @@ void *deal_msg_func(void *p)
     } /* while (1) */
 
     return NULL;
-} /* void *deal_msg_func(void *p) */
+} /* void *recv_msg_from_ipcam(void *p) */
 
 int main(int argc, char **argv)
 {
@@ -212,6 +278,7 @@ int main(int argc, char **argv)
     pthread_t deal_msg_pid;
     pthread_t deal_console_input_pid;
 
+    IPCAM_DEV = create_empty_ipcam_link();
     ret = pthread_create(&deal_console_input_pid, 0, 
                          deal_console_input, NULL);
     if (ret) {
@@ -220,7 +287,7 @@ int main(int argc, char **argv)
     }
 
     ret = pthread_create(&deal_msg_pid, 0, 
-                         deal_msg_func, NULL);
+                         recv_msg_from_ipcam, NULL);
     if (ret) {
         debug_print("pthread_create failed");
         exit(errno);

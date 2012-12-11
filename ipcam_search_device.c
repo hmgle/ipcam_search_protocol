@@ -9,15 +9,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "ipcam_message.h"
-
-#define DEBUG_PRINT         1
-#define debug_print(fmt, ...) \
-    do { \
-        if (DEBUG_PRINT) \
-            fprintf(stderr, "debug_print: %s: %d: %s():" \
-                    fmt "\n", __FILE__, __LINE__, __func__, \
-                    ##__VA_ARGS__); \
-    } while (0)
+#include "get_mac.h"
+#include "debug_print.h"
 
 #define IPCAM_SERVER_PORT   6755
 #define PC_SERVER_PORT      6756
@@ -25,6 +18,7 @@
 
 int IPCAM_SERVER_FD = -1;
 int IPCAM_CLIENT_FD = -1;
+uint8_t buf[512];
 
 int initsocket(void);
 void *deal_msg_func(void *p);
@@ -73,9 +67,19 @@ void broadcast_login_msg(void)
     const int on = 1;
     struct ipcam_search_msg login_msg;
 
+    uint8_t mac[6];
+    get_mac(mac);
+    debug_print("mac is %02x:%02x:%02x:%02x:%02x:%02x\n", 
+                mac[0], 
+                mac[1], 
+                mac[2], 
+                mac[3], 
+                mac[4], 
+                mac[5]);
+
     memset(&login_msg, 0, sizeof(login_msg));
     login_msg.type = IPCAMMSG_LOGIN;
-    strncpy(login_msg.ipcam_name, "ipcam_test", sizeof(login_msg.ipcam_name));
+    strncpy(login_msg.ipcam_name, "ipcam_name0", sizeof(login_msg.ipcam_name));
 
     server.sin_family = AF_INET;
     server.sin_port = htons(PC_SERVER_PORT);
@@ -87,8 +91,11 @@ void broadcast_login_msg(void)
         exit(errno);
     }
 
-    ret = sendto(IPCAM_CLIENT_FD, &login_msg, sizeof(login_msg), 0,
-                 (const struct sockaddr *)&server, 
+    memcpy(buf, &login_msg, sizeof(login_msg));
+    memcpy(buf + sizeof(login_msg), mac, sizeof(mac));
+    ((struct ipcam_search_msg *)buf)->exten_len = sizeof(mac);
+    ret = sendto(IPCAM_CLIENT_FD, buf, sizeof(login_msg) + sizeof(mac), 
+                 0, (const struct sockaddr *)&server, 
                  (socklen_t)sizeof(server));
     debug_print("ret is %d", ret);
 
