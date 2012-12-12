@@ -10,21 +10,25 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <time.h>
 #include "ipcam_message.h"
+#include "socket_wrap.h"
 #include "get_mac.h"
+#include "config_ipcam_info.h"
 #include "debug_print.h"
 
 #define IPCAM_SERVER_PORT   6755
 #define PC_SERVER_PORT      6756
 #define MAX_MSG_LEN         512
 
-int IPCAM_SERVER_FD = -1;
-int IPCAM_CLIENT_FD = -1;
-int SSRC;
-uint8_t buf[512];
+static int IPCAM_SERVER_FD = -1;
+static int IPCAM_CLIENT_FD = -1;
+static uint32_t SSRC;
 
 int initsocket(void);
-void *deal_msg_func(void *p);
+static void replay_alive_msg(const struct ipcam_search_msg *recv_msg, const struct sockaddr_in *from);
+static void ipcam_deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
+static void *recv_msg_from_pc(void *p);
 void broadcast_login_msg(void);
 
 int initsocket(void)
@@ -58,17 +62,72 @@ int initsocket(void)
     return 0;
 } /* int initsocket(void) */
 
-void *deal_msg_func(void *p)
+static void replay_alive_msg(const struct ipcam_search_msg *recv_msg, const struct sockaddr_in *from)
 {
+    struct sockaddr_in remote_sockaddr;
+    struct ipcam_search_msg send_msg = {0};
+
+    send_msg.type = IPCAMMSG_ACK_ALIVE;
+    send_msg.deal_id = recv_msg->deal_id;
+    send_msg.ssrc = SSRC;
+    send_msg.timestamp = time(NULL);
+    get_ipcam_name(send_msg.ipcam_name);
+
+    memcpy(&remote_sockaddr, from, sizeof(remote_sockaddr));
+    remote_sockaddr.sin_port = htons(PC_SERVER_PORT);
+    send_msg_by_sockaddr(&send_msg, sizeof(send_msg), &remote_sockaddr);
+
+    return;
+}
+
+static void ipcam_deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from)
+{
+    switch (msg->type) {
+    case IPCAMMSG_QUERY_ALIVE:
+        replay_alive_msg(msg, from);
+        break;
+    default:
+        break;
+    }
+
+    return;
+}
+
+static void *recv_msg_from_pc(void *p)
+{
+    int ret;
+    struct sockaddr_in peer;
+    uint8_t buf[MAX_MSG_LEN];
+    struct ipcam_search_msg *msg_buf;
+    socklen_t len;
+
+    while (1) {
+        len = sizeof(struct sockaddr_in);
+        ret = recvfrom(IPCAM_SERVER_FD, buf, sizeof(buf), 0, 
+                       (struct sockaddr *)&peer, 
+                       (socklen_t *)&len);
+        if (ret < 0) {
+            debug_log("recvfrom fail");
+            continue;
+        }
+        msg_buf = malloc(sizeof(struct ipcam_search_msg) 
+                         + ((struct ipcam_search_msg *)buf)->exten_len);
+        parse_msg((const char *)buf, ret, msg_buf);
+        ipcam_deal_msg_func(msg_buf, &peer);
+
+        if (msg_buf) {
+            free(msg_buf);
+            msg_buf = NULL;
+        }
+    }
     return NULL;
 }
 
 void broadcast_login_msg(void)
 {
     int ret;
-    struct sockaddr_in server;
-    const int on = 1;
     struct ipcam_search_msg login_msg;
+    uint8_t buf[MAX_MSG_LEN];
 
     uint8_t mac[6];
     get_mac(mac);
@@ -83,24 +142,14 @@ void broadcast_login_msg(void)
     memset(&login_msg, 0, sizeof(login_msg));
     login_msg.type = IPCAMMSG_LOGIN;
     login_msg.ssrc = SSRC;
-    strncpy(login_msg.ipcam_name, "ipcam_name0", sizeof(login_msg.ipcam_name));
-
-    server.sin_family = AF_INET;
-    server.sin_port = htons(PC_SERVER_PORT);
-    server.sin_addr.s_addr = inet_addr("255.255.255.255");
-
-    ret = setsockopt(IPCAM_CLIENT_FD, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
-    if (ret < 0) {
-        debug_log("setsockopt fail");
-        exit(errno);
-    }
+    login_msg.timestamp = time(NULL);
+    debug_print("timestamp is %d\n", login_msg.timestamp);
+    get_ipcam_name(login_msg.ipcam_name);
 
     memcpy(buf, &login_msg, sizeof(login_msg));
     memcpy(buf + sizeof(login_msg), mac, sizeof(mac));
     ((struct ipcam_search_msg *)buf)->exten_len = sizeof(mac);
-    ret = sendto(IPCAM_CLIENT_FD, buf, sizeof(login_msg) + sizeof(mac), 
-                 0, (const struct sockaddr *)&server, 
-                 (socklen_t)sizeof(server));
+    ret = broadcast_msg(PC_SERVER_PORT, buf, sizeof(login_msg) + sizeof(mac));
     debug_log("sendto return %d", ret);
 
     return;
@@ -176,7 +225,7 @@ int main(int argc, char **argv)
     broadcast_login_msg();
 
     ret = pthread_create(&deal_msg_pid, 0, 
-                         deal_msg_func, NULL);
+                         recv_msg_from_pc, NULL);
     if (ret) {
         debug_log("pthread_create failed");
         exit(errno);

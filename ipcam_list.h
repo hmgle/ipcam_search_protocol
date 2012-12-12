@@ -8,6 +8,7 @@ typedef struct ipcam_info {
     struct in_addr ipaddr;
     uint8_t mac[6];
     uint8_t ipcam_name[64];
+    uint32_t timestamp;
 } ipcam_info_t;
 
 struct ipcam_node {

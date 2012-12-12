@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -8,6 +9,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include "socket_wrap.h"
 #include "ipcam_message.h"
 #include "ipcam_list.h"
 #include "debug_print.h"
@@ -21,17 +23,18 @@
 #define PC_SERVER_PORT      6756
 
 static ipcam_link IPCAM_DEV;
+static uint32_t SSRC;
 
 void list_ipcam(ipcam_link ipcam_dev);
 int run_cmd_by_string(char *cmd_string);
+static void search_ipcam(void);
 static char *get_line(char *s, size_t n, FILE *f);
 void ctrl_c(int signo);
 void deal_console_input_sig_init(void);
 void release_exit(int signo);
 void *deal_console_input(void *p);
 void *recv_msg_from_ipcam(void *p);
-void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
-int parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg);
+static void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
 #if 0
 struct ipcam_search_msg {
     uint8_t     type;
@@ -60,10 +63,24 @@ enum {
 
 void list_ipcam(ipcam_link ipcam_dev)
 {
+    char time_str[128] = {0};
     pipcam_node q = ipcam_dev->next;
 
+    printf("\n");
+    printf("IP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
     while (q) {
-        debug_print("ipcam_name is %s", q->node_info.ipcam_name);
+        printf("%s\t", inet_ntoa(q->node_info.ipaddr));
+        printf("%s\t", q->node_info.ipcam_name);
+        printf("%02x:%02x:%02x:%02x:%02x:%02x\t", 
+                q->node_info.mac[0],
+                q->node_info.mac[1],
+                q->node_info.mac[2],
+                q->node_info.mac[3],
+                q->node_info.mac[4],
+                q->node_info.mac[5]);
+        strftime(time_str, sizeof(time_str), "%F %R:%S",
+                 localtime((const time_t *)&(q->node_info.timestamp)));
+        printf("%s\n", time_str);
         q = q->next;
     }
 
@@ -76,7 +93,10 @@ int run_cmd_by_string(char *cmd_string)
 
     debug_print("cmd is %s", cmd_string);
     switch (cmd_string[0]) {
-    case 'l':   /* test */
+    case 's':   /* search ipcam dev */
+        search_ipcam();
+        sleep(1);
+    case 'l':   /* list ipcam dev */
         list_ipcam(IPCAM_DEV);
         break;
     default:
@@ -84,6 +104,19 @@ int run_cmd_by_string(char *cmd_string)
     } /* switch (cmd_string[0]) */
 
     return ret;
+}
+
+static void search_ipcam(void)
+{
+    int ret;
+    struct ipcam_search_msg send_msg = {0};
+
+    send_msg.type = 0x4;
+    send_msg.ssrc = SSRC;
+    ret = broadcast_msg(IPCAM_SERVER_PORT, &send_msg, sizeof(send_msg));
+    debug_print("sendto return %d", ret);
+
+    return;
 }
 
 static char *get_line(char *s, size_t n, FILE *f)
@@ -101,6 +134,7 @@ static char *get_line(char *s, size_t n, FILE *f)
 
 void ctrl_c(int signo)
 {
+    fprintf(stdout, "\nGood-bye \n");
     release_exit(0);
     return;
 }
@@ -152,31 +186,7 @@ void *deal_console_input(void *p)
     return NULL;
 } /* void *deal_console_input(void *p) */
 
-int parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg)
-{
-    int exten_len;
-
-    exten_len = ((struct ipcam_search_msg *)msg)->exten_len;
-    save_msg->type = ((struct ipcam_search_msg *)msg)->type;
-    save_msg->deal_id = ((struct ipcam_search_msg *)msg)->deal_id;
-    save_msg->flag = ((struct ipcam_search_msg *)msg)->flag;
-    save_msg->exten_len = exten_len;
-    save_msg->ssrc = ((struct ipcam_search_msg *)msg)->ssrc;
-    save_msg->timestamp = ((struct ipcam_search_msg *)msg)->timestamp;
-    save_msg->heartbeat_num = ((struct ipcam_search_msg *)msg)->heartbeat_num;
-    memcpy(save_msg->ipcam_name, 
-            ((struct ipcam_search_msg *)msg)->ipcam_name, 
-            sizeof(save_msg->ipcam_name));
-    if (exten_len) {
-        memcpy(save_msg->exten_msg, 
-               ((struct ipcam_search_msg *)msg)->exten_msg, 
-               exten_len);
-    }
-
-    return 0;
-}
-
-void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from)
+static void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from)
 {
     ipcam_info_t remote_ipcam_info;
     struct ipcam_node new_ipcam_node;
@@ -190,6 +200,7 @@ void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in 
         memcpy(remote_ipcam_info.mac, msg->exten_msg, msg->exten_len);
         memcpy(remote_ipcam_info.ipcam_name, msg->ipcam_name, 
                 (size_t)sizeof(remote_ipcam_info.ipcam_name));
+        remote_ipcam_info.timestamp = msg->timestamp;
         debug_print("ipaddr is %s", inet_ntoa(remote_ipcam_info.ipaddr));
         debug_print("mac is %02x:%02x:%02x:%02x:%02x:%02x", 
             remote_ipcam_info.mac[0],
@@ -198,17 +209,19 @@ void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in 
             remote_ipcam_info.mac[3],
             remote_ipcam_info.mac[4],
             remote_ipcam_info.mac[5]);
-        debug_print("ipcam_name is %s", remote_ipcam_info.ipcam_name);
+        debug_print("ipcam_name is %s\n", remote_ipcam_info.ipcam_name);
+        debug_print("timestamp is %d\n", remote_ipcam_info.timestamp);
         memset(&new_ipcam_node, 0, sizeof(new_ipcam_node));
         new_ipcam_node.node_info = remote_ipcam_info;
         new_ipcam_node.alive_flag = 1;
-        insert_ipcam_node(IPCAM_DEV, &new_ipcam_node);
+        insert_nodulp_ipcam_node(IPCAM_DEV, &new_ipcam_node);
         break;
     case IPCAMMSG_LOGOUT:
         break;
     case IPCAMMSG_HEARTBEAT:
         break;
     case IPCAMMSG_ACK_ALIVE:
+        debug_print("recv msg: IPCAMMSG_ACK_ALIVE");
         break;
     case IPCAMMSG_ACK_DHCP:
         break;
@@ -257,10 +270,10 @@ void *recv_msg_from_ipcam(void *p)
             debug_print("recvfrom fail");
             continue;
         }
+        debug_print("recvfrom return %d", ret);
         msg_buf = malloc(sizeof(struct ipcam_search_msg) 
                          + ((struct ipcam_search_msg *)buf)->exten_len);
         parse_msg(buf, ret, msg_buf);
-
         deal_msg_func(msg_buf, &peer);
 
         if (msg_buf) {
@@ -278,7 +291,9 @@ int main(int argc, char **argv)
     pthread_t deal_msg_pid;
     pthread_t deal_console_input_pid;
 
+    SSRC = getpid();
     IPCAM_DEV = create_empty_ipcam_link();
+
     ret = pthread_create(&deal_console_input_pid, 0, 
                          deal_console_input, NULL);
     if (ret) {
