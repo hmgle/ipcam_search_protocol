@@ -122,8 +122,11 @@ void free_ipcam_link(ipcam_link link)
 
     do {
         free(link->next);
-        link->next = q;
-        q = q->next;
-    } while (q);
+        if (q) {
+            link->next = q;
+            q = q->next;
+        } else
+            break;
+    } while (1);
     return;
 }

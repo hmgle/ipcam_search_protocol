@@ -191,7 +191,7 @@ void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in 
         memcpy(remote_ipcam_info.ipcam_name, msg->ipcam_name, 
                 (size_t)sizeof(remote_ipcam_info.ipcam_name));
         debug_print("ipaddr is %s", inet_ntoa(remote_ipcam_info.ipaddr));
-        debug_print("mac is %02x:%02x:%02x:%02x:%02x:%02x\n", 
+        debug_print("mac is %02x:%02x:%02x:%02x:%02x:%02x", 
             remote_ipcam_info.mac[0],
             remote_ipcam_info.mac[1],
             remote_ipcam_info.mac[2],

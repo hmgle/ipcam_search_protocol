@@ -1,5 +1,7 @@
 CFLAGS = -Wall -O2 -fno-strict-aliasing
+CROSS_COMPILE=
 CC = gcc
+CC := $(CROSS_COMPILE)$(CC)
 
 TARGET = ipcam_search_pc ipcam_search_device
 
