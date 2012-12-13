@@ -20,16 +20,22 @@
 #define IPCAM_SERVER_PORT   6755
 #define PC_SERVER_PORT      6756
 #define MAX_MSG_LEN         512
+#define HEARTBEAT_CYCLE     10      /* 10s */
 
 static int IPCAM_SERVER_FD = -1;
 static int IPCAM_CLIENT_FD = -1;
+static time_t STARTUP_TIME;
 static uint32_t SSRC;
+static uint8_t IPCAM_MAC[6];
 
 int initsocket(void);
 static void replay_alive_msg(const struct ipcam_search_msg *recv_msg, const struct sockaddr_in *from);
 static void ipcam_deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
 static void *recv_msg_from_pc(void *p);
 void broadcast_login_msg(void);
+static void send_heartbeat_msg(void);
+static void send_logout_msg(void);
+static void release_exit(int signo);
 
 int initsocket(void)
 {
@@ -66,16 +72,24 @@ static void replay_alive_msg(const struct ipcam_search_msg *recv_msg, const stru
 {
     struct sockaddr_in remote_sockaddr;
     struct ipcam_search_msg send_msg = {0};
+    uint8_t buf[MAX_MSG_LEN];
 
     send_msg.type = IPCAMMSG_ACK_ALIVE;
     send_msg.deal_id = recv_msg->deal_id;
     send_msg.ssrc = SSRC;
     send_msg.timestamp = time(NULL);
     get_ipcam_name(send_msg.ipcam_name);
+    memcpy(buf, &send_msg, sizeof(send_msg));
+    memcpy(buf + sizeof(send_msg), IPCAM_MAC, sizeof(IPCAM_MAC));
+    memcpy(buf + sizeof(send_msg) + sizeof(IPCAM_MAC), &STARTUP_TIME, 
+            sizeof(STARTUP_TIME));
+    ((struct ipcam_search_msg *)buf)->exten_len = sizeof(IPCAM_MAC)
+                        + sizeof(STARTUP_TIME);
 
     memcpy(&remote_sockaddr, from, sizeof(remote_sockaddr));
     remote_sockaddr.sin_port = htons(PC_SERVER_PORT);
-    send_msg_by_sockaddr(&send_msg, sizeof(send_msg), &remote_sockaddr);
+    send_msg_by_sockaddr(buf, sizeof(send_msg) + 
+                ((struct ipcam_search_msg *)buf)->exten_len, &remote_sockaddr);
 
     return;
 }
@@ -129,30 +143,103 @@ void broadcast_login_msg(void)
     struct ipcam_search_msg login_msg;
     uint8_t buf[MAX_MSG_LEN];
 
-    uint8_t mac[6];
-    get_mac(mac);
     debug_log("mac is %02x:%02x:%02x:%02x:%02x:%02x", 
-                mac[0], 
-                mac[1], 
-                mac[2], 
-                mac[3], 
-                mac[4], 
-                mac[5]);
+                IPCAM_MAC[0], 
+                IPCAM_MAC[1], 
+                IPCAM_MAC[2], 
+                IPCAM_MAC[3], 
+                IPCAM_MAC[4], 
+                IPCAM_MAC[5]);
 
     memset(&login_msg, 0, sizeof(login_msg));
     login_msg.type = IPCAMMSG_LOGIN;
     login_msg.ssrc = SSRC;
     login_msg.timestamp = time(NULL);
-    debug_print("timestamp is %d\n", login_msg.timestamp);
     get_ipcam_name(login_msg.ipcam_name);
 
     memcpy(buf, &login_msg, sizeof(login_msg));
-    memcpy(buf + sizeof(login_msg), mac, sizeof(mac));
-    ((struct ipcam_search_msg *)buf)->exten_len = sizeof(mac);
-    ret = broadcast_msg(PC_SERVER_PORT, buf, sizeof(login_msg) + sizeof(mac));
+    memcpy(buf + sizeof(login_msg), IPCAM_MAC, sizeof(IPCAM_MAC));
+    ((struct ipcam_search_msg *)buf)->exten_len = sizeof(IPCAM_MAC);
+    ret = broadcast_msg(PC_SERVER_PORT, buf, sizeof(login_msg) + sizeof(IPCAM_MAC));
     debug_log("sendto return %d", ret);
 
     return;
+}
+
+static void send_logout_msg(void)
+{
+    int ret;
+    struct ipcam_search_msg logout_msg;
+    uint8_t buf[MAX_MSG_LEN];
+
+    memset(&logout_msg, 0, sizeof(logout_msg));
+
+    logout_msg.type = IPCAMMSG_LOGOUT;
+    logout_msg.ssrc = SSRC;
+    logout_msg.timestamp = time(NULL);
+    get_ipcam_name(logout_msg.ipcam_name);
+
+    memcpy(buf, &logout_msg, sizeof(logout_msg));
+    memcpy(buf + sizeof(logout_msg), IPCAM_MAC, sizeof(IPCAM_MAC));
+
+    memcpy(buf + sizeof(logout_msg) + sizeof(IPCAM_MAC), &STARTUP_TIME, 
+            sizeof(STARTUP_TIME));
+    ((struct ipcam_search_msg *)buf)->exten_len = sizeof(IPCAM_MAC)
+                        + sizeof(STARTUP_TIME);
+
+    ret = broadcast_msg(PC_SERVER_PORT, buf, 
+            sizeof(logout_msg) + ((struct ipcam_search_msg *)buf)->exten_len);
+    if (ret < 0)
+        debug_log("broadcast_msg fail");
+}
+
+static void send_heartbeat_msg(void)
+{
+    int ret;
+    struct ipcam_search_msg heartbeat_msg;
+    uint8_t buf[MAX_MSG_LEN];
+
+    memset(&heartbeat_msg, 0, sizeof(heartbeat_msg));
+
+    heartbeat_msg.type = IPCAMMSG_HEARTBEAT;
+    heartbeat_msg.ssrc = SSRC;
+    heartbeat_msg.timestamp = time(NULL);
+    heartbeat_msg.heartbeat_num = 0;
+    get_ipcam_name(heartbeat_msg.ipcam_name);
+
+    memcpy(buf, &heartbeat_msg, sizeof(heartbeat_msg));
+    memcpy(buf + sizeof(heartbeat_msg), IPCAM_MAC, sizeof(IPCAM_MAC));
+    memcpy(buf + sizeof(heartbeat_msg) + sizeof(IPCAM_MAC), &STARTUP_TIME, 
+            sizeof(STARTUP_TIME));
+    ((struct ipcam_search_msg *)buf)->exten_len = sizeof(IPCAM_MAC)
+                        + sizeof(STARTUP_TIME);
+
+    while (1) {
+        ret = broadcast_msg(PC_SERVER_PORT, buf, 
+                sizeof(heartbeat_msg) + ((struct ipcam_search_msg *)buf)->exten_len);
+        if (ret < 0)
+            debug_log("broadcast_msg fail");
+
+        ((struct ipcam_search_msg *)buf)->heartbeat_num++;
+        sleep(HEARTBEAT_CYCLE);
+    } /* while (1) */
+}
+
+static void release_exit(int signo)
+{
+   send_logout_msg();
+
+    /*
+     * release resources
+     */
+    close(IPCAM_SERVER_FD);
+    close(IPCAM_CLIENT_FD);
+    close_debug_log();
+
+    /*
+     * exit
+     */
+    exit(signo);
 }
 
 int main(int argc, char **argv)
@@ -162,7 +249,12 @@ int main(int argc, char **argv)
     struct sigaction sa;
     pthread_t deal_msg_pid;
 
+    signal(SIGINT, release_exit);
+    signal(SIGTERM, release_exit);
     open_debug_log("./_ipcam_device_debug.log");
+
+    STARTUP_TIME = time(NULL);
+    get_mac(IPCAM_MAC);
 
     /*
      * deamon init
@@ -231,8 +323,9 @@ int main(int argc, char **argv)
         exit(errno);
     }
 
-    pthread_join(deal_msg_pid, NULL);
+    send_heartbeat_msg();
 
+    pthread_join(deal_msg_pid, NULL);
     close_debug_log();
 
     return 0;

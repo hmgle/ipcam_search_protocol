@@ -27,10 +27,11 @@ ipcam_link insert_ipcam_node(ipcam_link link, const pipcam_node insert_node)
     return link;
 }
 
-ipcam_link delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
+int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
 {
+    int ret = 0;
     if (link->next == NULL)
-        return link;
+        return 0;
 
     pipcam_node q = link->next;
     pipcam_node p = link;
@@ -43,12 +44,16 @@ ipcam_link delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
                 free(q);
                 q = NULL;
             }
+            ret++;
         }
         p = q;
-        q = q->next;
-    } while (q);
+        if (q)
+            q = q->next;
+        else
+            break;
+    } while (1);
 
-    return link;
+    return ret;
 }
 
 ipcam_link delete_this_ipcam_node(ipcam_link link, const pipcam_node this_node)

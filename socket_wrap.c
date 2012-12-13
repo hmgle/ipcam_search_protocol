@@ -15,18 +15,13 @@ int send_msg_by_sockaddr(const void *buf, size_t len, const struct sockaddr_in *
         exit(errno);
     }
 
-    /*
-    ret = sendto(socket_fd, buf, len, 
-                 0, (const struct sockaddr *)&from,  // fuck
-                 (socklen_t)sizeof(struct sockaddr_in));
-
-    debug_print("sendto return %d", ret);
-    */
     ret = sendto(socket_fd, buf, len, 
                  0, (const struct sockaddr *)from, 
                  (socklen_t)sizeof(struct sockaddr_in));
 
-    debug_print("sendto return %d", ret);
+    if (ret < 0) {
+        debug_print("sendto return %d", ret);
+    }
 
     close(socket_fd);
     return ret;
@@ -44,7 +39,6 @@ int broadcast_msg(uint16_t dst_port, const void *buf, size_t len)
         debug_print("socket fail");
         exit(errno);
     }
-    debug_print("socket_fd = %d", socket_fd);
 
     ret = setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on));
     if (ret < 0) {

@@ -8,7 +8,7 @@ typedef struct ipcam_info {
     struct in_addr ipaddr;
     uint8_t mac[6];
     uint8_t ipcam_name[64];
-    uint32_t timestamp;
+    uint32_t startup_time;
 } ipcam_info_t;
 
 struct ipcam_node {
@@ -22,7 +22,7 @@ typedef struct ipcam_node *ipcam_link;
 
 ipcam_link create_empty_ipcam_link(void);
 ipcam_link insert_ipcam_node(ipcam_link link, const pipcam_node insert_node);
-ipcam_link delete_ipcam_node_by_mac(ipcam_link link, const char *mac);
+int delete_ipcam_node_by_mac(ipcam_link link, const char *mac);
 ipcam_link delete_this_ipcam_node(ipcam_link link, const pipcam_node this_node);
 pipcam_node search_ipcam_node_by_mac(ipcam_link link, const char *mac);
 int num_ipcam_node(ipcam_link link);
