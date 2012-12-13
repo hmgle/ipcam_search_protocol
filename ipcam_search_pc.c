@@ -72,8 +72,7 @@ void list_ipcam(ipcam_link ipcam_dev)
     char time_str[128] = {0};
     pipcam_node q = ipcam_dev->next;
 
-    printf("\n");
-    printf("ALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
+    printf("\033[01;33mALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n\033[0m");
     while (q) {
         if (q->alive_flag & 1)
             printf("yes\t");
@@ -110,7 +109,14 @@ int run_cmd_by_string(char *cmd_string)
         list_ipcam(IPCAM_DEV);
         pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
         break;
+    case 'q':
+        release_exit(0);
+        break;
+    case 'h':
     default:
+        printf("\'s\': search ipcam dev\n");
+        printf("\'l\': list all ipcam dev\n");
+        printf("\'q\': quit\n");
         break;
     } /* switch (cmd_string[0]) */
 
@@ -181,7 +187,6 @@ void *deal_console_input(void *p)
             "type \"help\" for help\n");
     fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
     while (get_line(line_buf, sizeof(line_buf), stdin)) {
-        fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
         curr_cmd = strtok(line_buf, ";");
         if (curr_cmd) {
             ret = run_cmd_by_string(curr_cmd);
@@ -191,6 +196,7 @@ void *deal_console_input(void *p)
             ret = run_cmd_by_string(curr_cmd);
             debug_print("run_cmd_by_string return %d", ret);
         }
+        fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
     } /* while (get_line(line_buf, sizeof(line_buf), stdin)) */
     fprintf(stdout, "Good-bye \n");
     release_exit(0);
