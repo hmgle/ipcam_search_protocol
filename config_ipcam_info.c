@@ -6,7 +6,7 @@ char *get_ipcam_name(char *ipcam_name)
     /*
      * not finished
      */
-    strncpy(ipcam_name, "ipcam_name_jfaklqad", 32);
+    strncpy(ipcam_name, "ipcam_name_test", 32);
 
     return ipcam_name;
 }

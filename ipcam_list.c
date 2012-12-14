@@ -76,12 +76,25 @@ ipcam_link delete_this_ipcam_node(ipcam_link link, const pipcam_node this_node)
     return link;
 }
 
-pipcam_node search_ipcam_node_by_mac(ipcam_link link, const char *mac)
+int strvalncmp(const uint8_t *s1, const uint8_t *s2, size_t n)
+{
+    int i;
+    int ret = 0;
+
+    for (i = 0; i < n; i++) {
+        ret = s1[i] - s2[i];
+        if (ret)
+            return ret;
+    }
+    return 0;
+}
+
+pipcam_node search_ipcam_node_by_mac(ipcam_link link, const uint8_t *mac)
 {
     pipcam_node q = link->next;
 
     while (q) {
-        if (!strncmp((const char *)q->node_info.mac, mac, 
+        if (!strvalncmp(q->node_info.mac, mac, 
                      sizeof(q->node_info.mac)))
             return q;
         q = q->next;
@@ -109,7 +122,8 @@ int insert_nodulp_ipcam_node(ipcam_link link, const pipcam_node insert_node)
 {
     int ret = 0;
     if (!search_ipcam_node_by_mac(link, 
-                (const char *)insert_node->node_info.mac)) {
+                    insert_node->node_info.mac)) {
+        debug_print();
         insert_ipcam_node(link, insert_node);
         ret = 1;
     }

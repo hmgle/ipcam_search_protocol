@@ -1,6 +1,6 @@
 CFLAGS = -Wall -O2 -fno-strict-aliasing
 LIBS = -lpthread
-CROSS_COMPILE=
+CROSS_COMPILE = 
 CC = gcc
 CC := $(CROSS_COMPILE)$(CC)
 STRIP ?= strip
