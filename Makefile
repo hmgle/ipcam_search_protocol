@@ -12,6 +12,7 @@ else
 	WINLIBS =
 	CFLAGS += -D_LINUX_=1
 endif
+LIBS += $(WINLIBS)
 CROSS_COMPILE = 
 CC = gcc
 CC := $(CROSS_COMPILE)$(CC)
