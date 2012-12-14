@@ -340,6 +340,14 @@ void *recv_msg_from_ipcam(void *p)
     socklen_t len;
     int ret;
 
+#if !_LINUX_
+    WSADATA wsadata;
+    if (WSAStartup(MAKEWORD(1, 1), &wsadata) == SOCKET_ERROR) {
+        debug_print("WSAStartup() fail\n");
+        exit(errno);
+    }
+#endif
+
     pc_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (pc_server_fd == -1) {
         debug_print("socket fail");
