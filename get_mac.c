@@ -5,6 +5,7 @@
 
 uint8_t *get_mac(uint8_t *str_mac)
 {
+#if _LINUX_
     int sock;
     struct ifreq ifr;
     struct ifconf ifc;
@@ -48,5 +49,17 @@ uint8_t *get_mac(uint8_t *str_mac)
         return str_mac;
     } else
         return NULL;
+#else
+	IP_ADAPTER_INFO AdapterInfo[16];
+	DWORD dwBufLen = sizeof(AdapterInfo);
+
+	DWORD dwStatus = GetAdaptersInfo( AdapterInfo, &dwBufLen);
+	assert(dwStatus == ERROR_SUCCESS);
+
+	PIP_ADAPTER_INFO pAdapterInfo = AdapterInfo;
+    memcpy(str_mac, pAdapterInfo->Address, 6);
+
+    return str_mac;
+#endif
 }
 

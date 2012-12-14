@@ -2,7 +2,11 @@
 #define _IPCAM_LIST_H
 
 #include <stdint.h>
+#if _LINUX_
 #include <netinet/in.h>
+#else
+#include <windows.h>
+#endif
 
 typedef struct ipcam_info {
     struct in_addr ipaddr;

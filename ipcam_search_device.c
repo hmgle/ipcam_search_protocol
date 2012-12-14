@@ -6,9 +6,14 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#if _LINUX_
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#else
+#include <windows.h>
+#define sleep(n) Sleep(1000 * (n))
+#endif
 #include <pthread.h>
 #include <time.h>
 #include "ipcam_message.h"
@@ -41,6 +46,14 @@ int initsocket(void)
 {
     int ret;
     struct sockaddr_in ipcam_server;
+
+#if !_LINUX_
+    WSADATA wsadata;
+    if (WSAStartup(MAKEWORD(1, 1), &wsadata) == SOCKET_ERROR) {
+        debug_print("WSAStartup() fail\n");
+        exit(errno);
+    }
+#endif
 
     IPCAM_CLIENT_FD = socket(AF_INET, SOCK_DGRAM, 0);
     if (IPCAM_CLIENT_FD == -1) {
@@ -245,8 +258,10 @@ static void release_exit(int signo)
 int main(int argc, char **argv)
 {
     int ret;
+#if _LINUX_
     int devnullfd;
     struct sigaction sa;
+#endif
     pthread_t deal_msg_pid;
 
     signal(SIGINT, release_exit);
@@ -265,6 +280,7 @@ int main(int argc, char **argv)
         exit(errno);
     }
 
+#if _LINUX_
     devnullfd = open("/dev/null", 0);
     if (devnullfd == -1) {
         debug_print("open fail");
@@ -303,6 +319,7 @@ int main(int argc, char **argv)
         debug_log("sigaction fail");
         exit(errno);
     }
+#endif
 
     if (chdir("/") < 0) {
         debug_log("chdir fail");

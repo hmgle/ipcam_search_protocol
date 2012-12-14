@@ -1,5 +1,17 @@
+# mingw: make os=win
+# linux: make
+
+os =
+EXESUF =
 CFLAGS = -Wall -O2 -fno-strict-aliasing
 LIBS = -lpthread
+ifeq ($(os), win)
+	WINLIBS = -lws2_32 -liphlpapi
+	EXESUF = .exe
+else
+	WINLIBS =
+	CFLAGS += -D_LINUX_=1
+endif
 CROSS_COMPILE = 
 CC = gcc
 CC := $(CROSS_COMPILE)$(CC)
@@ -15,7 +27,7 @@ all: $(TARGET)
 ipcam_search_pc: ipcam_search_pc.o ipcam_list.o ipcam_message.o \
 				 socket_wrap.o
 	$(CC) -o $@ $^ $(LIBS)
-	$(STRIP) $@
+	$(STRIP) $@$(EXESUF)
 
 ipcam_search_pc.o: ipcam_search_pc.c ipcam_message.h debug_print.h
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -26,7 +38,7 @@ ipcam_list.o: ipcam_list.c ipcam_list.h debug_print.h
 ipcam_search_device: ipcam_search_device.o get_mac.o ipcam_message.o \
 					 socket_wrap.o config_ipcam_info.o
 	$(CC) -o $@ $^ $(LIBS)
-	$(STRIP) $@
+	$(STRIP) $@$(EXESUF)
 
 config_ipcam_info.o: config_ipcam_info.c config_ipcam_info.h
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -47,4 +59,4 @@ ipcam_search_device.o: ipcam_search_device.c ipcam_message.h \
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 clean:
-	-rm -f $(TARGET) *.o
+	-rm -f $(TARGET:%=%$(EXESUF)) *.o

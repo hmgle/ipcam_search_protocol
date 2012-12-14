@@ -5,9 +5,14 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/types.h>
+#if _LINUX_
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#else
+#include <windows.h>
+#define sleep(n) Sleep(1000 * (n))
+#endif
 #include <pthread.h>
 #include "socket_wrap.h"
 #include "ipcam_message.h"
@@ -237,12 +242,10 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
         new_ipcam_node.alive_flag = 1;
 
         pthread_mutex_lock(&IPCAM_DEV_MUTEX);
-        debug_print();
         ret = insert_nodulp_ipcam_node(IPCAM_DEV, &new_ipcam_node);
-        debug_print();
         if (!ret) {
             tmp_node = search_ipcam_node_by_mac(IPCAM_DEV, 
-                                        (const char *)remote_ipcam_info.mac);
+                                        remote_ipcam_info.mac);
             tmp_node->alive_flag = 1;
         }
         debug_print("insert return %d", ret);
@@ -276,7 +279,7 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
         ret = insert_nodulp_ipcam_node(IPCAM_DEV, &new_ipcam_node);
         if (!ret) {
             tmp_node = search_ipcam_node_by_mac(IPCAM_DEV, 
-                                        (const char *)remote_ipcam_info.mac);
+                                                remote_ipcam_info.mac);
             tmp_node->alive_flag = 1;
         }
         pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
@@ -310,7 +313,7 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
         ret = insert_nodulp_ipcam_node(IPCAM_DEV, &new_ipcam_node);
         if (!ret) {
             tmp_node = search_ipcam_node_by_mac(IPCAM_DEV, 
-                                        (const char *)remote_ipcam_info.mac);
+                                                remote_ipcam_info.mac);
             tmp_node->alive_flag = 1;
         }
         pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
