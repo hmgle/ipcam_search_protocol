@@ -339,6 +339,7 @@ void *recv_msg_from_ipcam(void *p)
     struct ipcam_search_msg *msg_buf;
     socklen_t len;
     int ret;
+    int sock_opt;
 
 #if !_LINUX_
     WSADATA wsadata;
@@ -351,6 +352,14 @@ void *recv_msg_from_ipcam(void *p)
     pc_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (pc_server_fd == -1) {
         debug_print("socket fail");
+        exit(errno);
+    }
+
+    sock_opt = 1;
+    ret = setsockopt(pc_server_fd, SOL_SOCKET, SO_REUSEADDR, 
+                     &sock_opt, sizeof(sock_opt));
+    if (ret < 0) {
+        debug_print("setsockopt fail");
         exit(errno);
     }
 
