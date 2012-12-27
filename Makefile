@@ -10,7 +10,7 @@ $(info $(MAKE) PLATFORM=mingw)
 $(error No PLATFORM given.)
 endif
 
-ifeq ($(PLATFORM), win)
+ifeq ($(PLATFORM), mingw)
 	WINLIBS = -lws2_32 -liphlpapi
 	EXESUF = .exe
 else ifeq ($(PLATFORM), linux)
