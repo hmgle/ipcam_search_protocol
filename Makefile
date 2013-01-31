@@ -1,21 +1,39 @@
+<<<<<<< HEAD
 # mingw: make os=win
 # linux: make
 
 os =
 debug =
+=======
+PLATFORM =
+>>>>>>> bdb0f728e5dffdb7b524a0898e846be9a328b4b7
 EXESUF =
 CFLAGS = -Wall -O2 -fno-strict-aliasing
 LIBS = -lpthread
-ifeq ($(os), win)
+
+ifeq ($(PLATFORM),)
+$(info Please select your target platform by running one of the following commands:)
+$(info $(MAKE) PLATFORM=linux)
+$(info $(MAKE) PLATFORM=mingw)
+$(error No PLATFORM given.)
+endif
+
+ifeq ($(PLATFORM), mingw)
 	WINLIBS = -lws2_32 -liphlpapi
 	EXESUF = .exe
-else
+else ifeq ($(PLATFORM), linux)
 	WINLIBS =
 	CFLAGS += -D_LINUX_=1
+else
+$(error only for linux or mingw PLATFORM.)
 endif
+<<<<<<< HEAD
 ifeq ($(debug), 1)
 	CFLAGS += -DDEBUG=1
 endif
+=======
+
+>>>>>>> bdb0f728e5dffdb7b524a0898e846be9a328b4b7
 LIBS += $(WINLIBS)
 CROSS_COMPILE = 
 CC = gcc

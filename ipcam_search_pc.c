@@ -77,12 +77,17 @@ void list_ipcam(ipcam_link ipcam_dev)
     char time_str[128] = {0};
     pipcam_node q = ipcam_dev->next;
 
+#if _LINUX_
     printf("\033[01;33mALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n\033[0m");
+#else
+    printf("ALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
+#endif
     while (q) {
         if (q->alive_flag & 1)
             printf("yes\t");
         else
             printf("no\t");
+
         printf("%s\t", inet_ntoa(q->node_info.ipaddr));
         printf("%s\t", q->node_info.ipcam_name);
         printf("%02x:%02x:%02x:%02x:%02x:%02x\t", 
@@ -94,6 +99,7 @@ void list_ipcam(ipcam_link ipcam_dev)
                 q->node_info.mac[5]);
         strftime(time_str, sizeof(time_str), "%F %R:%S",
                  localtime((const time_t *)&(q->node_info.startup_time)));
+
         printf("%s\n", time_str);
         q = q->next;
     }
@@ -190,7 +196,11 @@ void *deal_console_input(void *p)
     deal_console_input_sig_init();
     fprintf(stdout, "Hello, This is ipc_shell\n"
             "type \"help\" for help\n");
+#if _LINUX_
     fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+#else
+    fprintf(stdout, "ipc_shell> ");
+#endif
     while (get_line(line_buf, sizeof(line_buf), stdin)) {
         curr_cmd = strtok(line_buf, ";");
         if (curr_cmd) {
@@ -201,7 +211,11 @@ void *deal_console_input(void *p)
             ret = run_cmd_by_string(curr_cmd);
             debug_print("run_cmd_by_string return %d", ret);
         }
+#if _LINUX_
         fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+#else
+        fprintf(stdout, "ipc_shell> ");
+#endif
     } /* while (get_line(line_buf, sizeof(line_buf), stdin)) */
     fprintf(stdout, "Good-bye \n");
     release_exit(0);
