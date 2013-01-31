@@ -2,6 +2,7 @@
 # linux: make
 
 os =
+debug =
 EXESUF =
 CFLAGS = -Wall -O2 -fno-strict-aliasing
 LIBS = -lpthread
@@ -11,6 +12,9 @@ ifeq ($(os), win)
 else
 	WINLIBS =
 	CFLAGS += -D_LINUX_=1
+endif
+ifeq ($(debug), 1)
+	CFLAGS += -DDEBUG=1
 endif
 LIBS += $(WINLIBS)
 CROSS_COMPILE = 

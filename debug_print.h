@@ -4,7 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#if DEBUG
 #define DEBUG_PRINT         1
+#else
+#define DEBUG_PRINT         0
+#endif
+
 #define debug_print(fmt, ...) \
     do { \
         if (DEBUG_PRINT) \
