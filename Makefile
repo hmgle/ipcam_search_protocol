@@ -1,12 +1,9 @@
-<<<<<<< HEAD
 # mingw: make os=win
 # linux: make
 
 os =
 debug =
-=======
 PLATFORM =
->>>>>>> bdb0f728e5dffdb7b524a0898e846be9a328b4b7
 EXESUF =
 CFLAGS = -Wall -O2 -fno-strict-aliasing
 LIBS = -lpthread
@@ -27,13 +24,10 @@ else ifeq ($(PLATFORM), linux)
 else
 $(error only for linux or mingw PLATFORM.)
 endif
-<<<<<<< HEAD
 ifeq ($(debug), 1)
 	CFLAGS += -DDEBUG=1
 endif
-=======
 
->>>>>>> bdb0f728e5dffdb7b524a0898e846be9a328b4b7
 LIBS += $(WINLIBS)
 CROSS_COMPILE = 
 CC = gcc
