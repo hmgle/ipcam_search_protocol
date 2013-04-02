@@ -43,10 +43,12 @@ TARGET = ipcam_search_pc ipcam_search_device
 
 all: $(TARGET)
 
+strip: all
+	$(STRIP) $(patsubst %,%$(EXESUF),$(TARGET))
+
 ipcam_search_pc: ipcam_search_pc.o ipcam_list.o ipcam_message.o \
 				 socket_wrap.o
 	$(CC) -o $@ $^ $(LIBS)
-	$(STRIP) $@$(EXESUF)
 
 ipcam_search_pc.o: ipcam_search_pc.c ipcam_message.h debug_print.h
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -57,7 +59,6 @@ ipcam_list.o: ipcam_list.c ipcam_list.h debug_print.h
 ipcam_search_device: ipcam_search_device.o get_mac.o ipcam_message.o \
 					 socket_wrap.o config_ipcam_info.o
 	$(CC) -o $@ $^ $(LIBS)
-	$(STRIP) $@$(EXESUF)
 
 config_ipcam_info.o: config_ipcam_info.c config_ipcam_info.h
 	$(CC) -c -o $@ $< $(CFLAGS)
