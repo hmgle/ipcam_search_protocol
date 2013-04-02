@@ -58,20 +58,17 @@ int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
 
 ipcam_link delete_this_ipcam_node(ipcam_link link, const pipcam_node this_node)
 {
-    if (!link->next)
-        return link;
+    pipcam_node *curr;
+    pipcam_node entry;
 
-    pipcam_node q = link->next;
-    pipcam_node p = link;
-
-    do {
-        if (q == this_node) {
-            free(q);
-            q = NULL;
-        }
-        p = q;
-        q = q->next;
-    } while (q);
+    for (curr = &link; (*curr)->next; ) {
+	    entry = (*curr)->next;
+	    if (entry == this_node) {
+		    *curr = entry->next;
+		    free(entry);
+	    } else
+		    curr = &entry->next;
+    }
 
     return link;
 }
