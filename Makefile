@@ -5,7 +5,7 @@ os =
 debug =
 PLATFORM =
 EXESUF =
-CFLAGS = -Wall -O2 -fno-strict-aliasing
+CFLAGS = -Wall -fno-strict-aliasing
 LIBS = -lpthread
 
 ifeq ($(PLATFORM),)
@@ -25,7 +25,9 @@ else
 $(error only for linux or mingw PLATFORM.)
 endif
 ifeq ($(debug), 1)
-	CFLAGS += -DDEBUG=1
+	CFLAGS += -Wextra -O0 -DDEBUG=1 -g
+else
+	CFLAGS += -O2
 endif
 
 LIBS += $(WINLIBS)
