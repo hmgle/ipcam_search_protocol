@@ -115,6 +115,18 @@ int run_cmd_by_string(char *cmd_string)
     case 's':   /* search ipcam dev */
         search_ipcam();
         sleep(1);
+        pthread_mutex_lock(&IPCAM_DEV_MUTEX);
+        list_ipcam(IPCAM_DEV);
+        pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
+        break;
+    case 'r': /* renew ipcam list */
+        pthread_mutex_lock(&IPCAM_DEV_MUTEX);
+        delete_ipcam_all_node(IPCAM_DEV);
+        search_ipcam();
+        sleep(1);
+        list_ipcam(IPCAM_DEV);
+        pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
+	break;
     case 'l':   /* list ipcam dev */
         pthread_mutex_lock(&IPCAM_DEV_MUTEX);
         list_ipcam(IPCAM_DEV);
@@ -126,8 +138,10 @@ int run_cmd_by_string(char *cmd_string)
     case 'h':
     default:
         printf("\'s\': search ipcam dev\n");
+        printf("\'r\': renew ipcam list\n");
         printf("\'l\': list all ipcam dev\n");
         printf("\'q\': quit\n");
+        printf("\'h\': show this help\n");
         break;
     } /* switch (cmd_string[0]) */
 
@@ -137,8 +151,9 @@ int run_cmd_by_string(char *cmd_string)
 static void search_ipcam(void)
 {
     int ret;
-    struct ipcam_search_msg send_msg = {0};
+    struct ipcam_search_msg send_msg;
 
+    memset(&send_msg, 0, sizeof(send_msg));
     send_msg.type = 0x4;
     send_msg.ssrc = SSRC;
     ret = broadcast_msg(IPCAM_SERVER_PORT, &send_msg, sizeof(send_msg));
