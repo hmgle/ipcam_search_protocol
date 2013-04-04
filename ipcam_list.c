@@ -89,14 +89,13 @@ pipcam_node search_ipcam_node_by_mac(ipcam_link link, const uint8_t *mac)
     return NULL;
 }
 
-int num_ipcam_node(ipcam_link link)
+int num_ipcam_node(const ipcam_link link)
 {
     int n = 0;
+    ipcam_link *curr;
 
-    while (link->next) {
+    for (curr = (ipcam_link *)&link; (*curr)->next; curr = &((*curr)->next))
         n++;
-        link = link->next;
-    }
     return n;
 }
 
