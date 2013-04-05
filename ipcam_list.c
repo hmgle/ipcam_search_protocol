@@ -29,42 +29,19 @@ ipcam_link insert_ipcam_node(ipcam_link link, const pipcam_node insert_node)
 
 int delete_ipcam_all_node(ipcam_link link)
 {
-#if 0
     int ret = 0;
-    pipcam_node *curr;
+    pipcam_node *curr = &link;
     pipcam_node entry;
 
-    for (curr = &link; (*curr)->next; ) {
-	    debug_print("ret is %d", ret);
-	    entry = (*curr)->next;
-	    debug_print("ret is %d", ret);
-	    *curr = entry->next;
-	    debug_print("ret is %d", ret);
-	    free(entry);
-	    if ((*curr))
+    while (*curr) {
+	    if ((entry = (*curr)->next) == NULL)
 		    break;
-	    debug_print("ret is %d", ret);
+	    (*curr)->next = entry->next;
+	    curr = &(entry->next);
+	    free(entry);
 	    ret++;
-	    debug_print("ret is %d", ret);
     }
     return ret;
-#else
-
-    int ret = 0;
-    pipcam_node *curr;
-    pipcam_node entry;
-
-    for (curr = &link; (*curr)->next; ) {
-	    entry = (*curr)->next;
-	    if (1) {
-		    *curr = entry->next;
-		    free(entry);
-		    ret++;
-	    } else
-		    curr = &entry->next;
-    }
-    return ret;
-#endif
 }
 
 int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
