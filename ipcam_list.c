@@ -45,17 +45,19 @@ int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
 {
     int ret = 0;
     pipcam_node *curr;
-    pipcam_node entry;
+    pipcam_node nextnode;
 
-    for (curr = &link; (*curr)->next; ) {
-	    entry = (*curr)->next;
-	    if (!strncmp((const char *)entry->node_info.mac, mac,
-			 sizeof(entry->node_info.mac))) {
-		    *curr = entry->next;
-		    free(entry);
+    for (curr = &link; *curr; ) {
+	    nextnode = (*curr)->next;
+	    if (nextnode == NULL)
+		    break;
+	    if (!strncmp((const char *)nextnode->node_info.mac, mac,
+			 sizeof(nextnode->node_info.mac))) {
+		    *curr = nextnode->next;
+		    free(nextnode);
 		    ret++;
 	    } else
-		    curr = &entry->next;
+		    curr = &nextnode;
     }
     return ret;
 }
