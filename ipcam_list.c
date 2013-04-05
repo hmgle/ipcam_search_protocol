@@ -33,11 +33,8 @@ int delete_ipcam_all_node(ipcam_link link)
     pipcam_node *curr = &link;
     pipcam_node entry;
 
-    while (*curr) {
-	    if ((entry = (*curr)->next) == NULL)
-		    break;
+    while ((entry = (*curr)->next) != NULL) {
 	    (*curr)->next = entry->next;
-	    curr = &(entry->next);
 	    free(entry);
 	    ret++;
     }
