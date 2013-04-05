@@ -122,8 +122,10 @@ int run_cmd_by_string(char *cmd_string)
     case 'r': /* renew ipcam list */
         pthread_mutex_lock(&IPCAM_DEV_MUTEX);
         delete_ipcam_all_node(IPCAM_DEV);
+        pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
         search_ipcam();
         sleep(1);
+        pthread_mutex_lock(&IPCAM_DEV_MUTEX);
         list_ipcam(IPCAM_DEV);
         pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 	break;
