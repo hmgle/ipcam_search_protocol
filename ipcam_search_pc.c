@@ -112,23 +112,13 @@ int run_cmd_by_string(char *cmd_string)
     int ret = -1;
 
     switch (cmd_string[0]) {
-    case 's':   /* search ipcam dev */
-        search_ipcam();
-        sleep(1);
-        pthread_mutex_lock(&IPCAM_DEV_MUTEX);
-        list_ipcam(IPCAM_DEV);
-        pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
-        break;
     case 'r': /* renew ipcam list */
         pthread_mutex_lock(&IPCAM_DEV_MUTEX);
         delete_ipcam_all_node(IPCAM_DEV);
         pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
+    case 's':   /* search ipcam dev */
         search_ipcam();
         sleep(1);
-        pthread_mutex_lock(&IPCAM_DEV_MUTEX);
-        list_ipcam(IPCAM_DEV);
-        pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
-	break;
     case 'l':   /* list ipcam dev */
         pthread_mutex_lock(&IPCAM_DEV_MUTEX);
         list_ipcam(IPCAM_DEV);
