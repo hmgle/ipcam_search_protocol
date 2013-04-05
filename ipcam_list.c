@@ -73,7 +73,7 @@ ipcam_link delete_this_ipcam_node(ipcam_link link, const pipcam_node this_node)
 		    *curr = entry->next;
 		    free(entry);
 	    } else
-		    curr = &entry->next;
+		    curr = &entry;
     }
     return link;
 }
