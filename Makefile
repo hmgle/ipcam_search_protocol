@@ -57,8 +57,11 @@ ipcam_list.o: ipcam_list.c ipcam_list.h debug_print.h
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 ipcam_search_device: ipcam_search_device.o get_mac.o ipcam_message.o \
-					 socket_wrap.o config_ipcam_info.o
+			socket_wrap.o config_ipcam_info.o para_parse.o
 	$(CC) -o $@ $^ $(LIBS)
+
+para_parse.o: para_parse.c para_parse.h
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 config_ipcam_info.o: config_ipcam_info.c config_ipcam_info.h
 	$(CC) -c -o $@ $< $(CFLAGS)

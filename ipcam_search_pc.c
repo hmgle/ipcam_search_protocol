@@ -133,6 +133,7 @@ int run_cmd_by_string(char *cmd_string)
 		printf("\'r\': renew ipcam list\n");
 		printf("\'l\': list all ipcam dev\n");
 		printf("\'q\': quit\n");
+		printf("setipcname?ip=ip&name=name\n");
 		printf("\'h\': show this help\n");
 		break;
 	} /* switch (cmd_string[0]) */

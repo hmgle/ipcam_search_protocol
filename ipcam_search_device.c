@@ -20,6 +20,7 @@
 #include "socket_wrap.h"
 #include "get_mac.h"
 #include "config_ipcam_info.h"
+#include "para_parse.h"
 #include "debug_print.h"
 
 #define IPCAM_SERVER_PORT   6755
