@@ -17,6 +17,7 @@
 #include "socket_wrap.h"
 #include "ipcam_message.h"
 #include "ipcam_list.h"
+#include "para_parse.h"
 #include "debug_print.h"
 
 #ifndef LINE_MAX

@@ -23,10 +23,10 @@
 #include "para_parse.h"
 #include "debug_print.h"
 
-#define IPCAM_SERVER_PORT   6755
-#define PC_SERVER_PORT	  6756
-#define MAX_MSG_LEN		 512
-#define HEARTBEAT_CYCLE	 10	  /* 10s */
+#define IPCAM_SERVER_PORT	6755
+#define PC_SERVER_PORT		6756
+#define MAX_MSG_LEN		512
+#define HEARTBEAT_CYCLE		10	/* 10s */
 
 static int IPCAM_SERVER_FD = -1;
 static int IPCAM_CLIENT_FD = -1;

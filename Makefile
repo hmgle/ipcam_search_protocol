@@ -50,7 +50,8 @@ ipcam_search_pc: ipcam_search_pc.o ipcam_list.o ipcam_message.o \
 				 socket_wrap.o
 	$(CC) -o $@ $^ $(LIBS)
 
-ipcam_search_pc.o: ipcam_search_pc.c ipcam_message.h debug_print.h
+ipcam_search_pc.o: ipcam_search_pc.c ipcam_message.h debug_print.h \
+		   para_parse.o
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 ipcam_list.o: ipcam_list.c ipcam_list.h debug_print.h
