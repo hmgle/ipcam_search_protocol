@@ -473,6 +473,8 @@ int main(int argc, char **argv)
 	pthread_t deal_console_input_pid;
 	pthread_t maintain_ipcam_link_pid;
 
+	aeEventLoop *loop;
+
 	SSRC = getpid();
 	IPCAM_DEV = create_empty_ipcam_link();
 
@@ -501,5 +503,6 @@ int main(int argc, char **argv)
 	pthread_join(deal_msg_pid, NULL);
 	pthread_join(deal_console_input_pid, NULL);
 
+	loop = aeCreateEventLoop();
 	return 0;
 }
