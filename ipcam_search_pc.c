@@ -20,6 +20,9 @@
 #include "para_parse.h"
 #include "debug_print.h"
 
+#include "ae.c"
+#include "anet.c"
+
 #ifndef LINE_MAX
 #define LINE_MAX            2048
 #endif
