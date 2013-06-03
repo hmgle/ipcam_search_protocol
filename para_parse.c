@@ -1,4 +1,5 @@
 #include "para_parse.h"
+#include <stdlib.h>
 
 char *para_parse_str(const char *src, const char *para, char *val)
 {
