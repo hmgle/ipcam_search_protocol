@@ -41,7 +41,7 @@ int delete_ipcam_all_node(ipcam_link link)
 
 int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
 {
-#if 0 /* fix me */
+#if 1
 	int ret = 0;
 	pipcam_node *curr;
 	pipcam_node nextnode;
@@ -52,7 +52,7 @@ int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
 			break;
 		if (!strncmp((const char *)nextnode->node_info.mac, mac,
 			 sizeof(nextnode->node_info.mac))) {
-			*curr = nextnode->next;
+			(*curr)->next = nextnode->next;
 			free(nextnode);
 			ret++;
 		} else
@@ -63,10 +63,8 @@ int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
     int ret = 0;
     if (link->next == NULL)
         return 0;
-
     pipcam_node q = link->next;
     pipcam_node p = link;
-
     do {
         if (!strncmp((const char *)q->node_info.mac, mac, 
                      sizeof(q->node_info.mac))) {
@@ -83,7 +81,6 @@ int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
         else
             break;
     } while (1);
-
     return ret;
 #endif
 }
