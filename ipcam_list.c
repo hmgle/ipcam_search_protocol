@@ -13,7 +13,6 @@ ipcam_link create_empty_ipcam_link(void)
 		debug_print("out of space!");
 		exit(errno);
 	}
-
 	return link0;
 }
 
@@ -23,7 +22,6 @@ ipcam_link insert_ipcam_node(ipcam_link link, const pipcam_node insert_node)
 	memcpy(q, insert_node, sizeof(struct ipcam_node));
 	q->next = link->next;
 	link->next = q;
-
 	return link;
 }
 
@@ -43,6 +41,7 @@ int delete_ipcam_all_node(ipcam_link link)
 
 int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
 {
+#if 0 /* fix me */
 	int ret = 0;
 	pipcam_node *curr;
 	pipcam_node nextnode;
@@ -60,6 +59,33 @@ int delete_ipcam_node_by_mac(ipcam_link link, const char *mac)
 			curr = &nextnode;
 	}
 	return ret;
+#else
+    int ret = 0;
+    if (link->next == NULL)
+        return 0;
+
+    pipcam_node q = link->next;
+    pipcam_node p = link;
+
+    do {
+        if (!strncmp((const char *)q->node_info.mac, mac, 
+                     sizeof(q->node_info.mac))) {
+            p->next = q->next;
+            if (q) {
+                free(q);
+                q = NULL;
+            }
+            ret++;
+        }
+        p = q;
+        if (q)
+            q = q->next;
+        else
+            break;
+    } while (1);
+
+    return ret;
+#endif
 }
 
 ipcam_link delete_this_ipcam_node(ipcam_link link, const pipcam_node this_node)
@@ -80,7 +106,7 @@ ipcam_link delete_this_ipcam_node(ipcam_link link, const pipcam_node this_node)
 
 int strvalncmp(const uint8_t *s1, const uint8_t *s2, size_t n)
 {
-	int i;
+	size_t i;
 	int ret = 0;
 
 	for (i = 0; i < n; i++) {
@@ -101,7 +127,6 @@ pipcam_node search_ipcam_node_by_mac(ipcam_link link, const uint8_t *mac)
 			return q;
 		q = q->next;
 	}
-
 	return NULL;
 }
 
