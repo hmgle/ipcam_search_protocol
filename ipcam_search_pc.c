@@ -20,8 +20,10 @@
 #include "para_parse.h"
 #include "debug_print.h"
 
+#if _LINUX_
 #include "ae.c"
 #include "anet.c"
+#endif
 
 #ifndef LINE_MAX
 #define LINE_MAX            2048
@@ -472,8 +474,9 @@ int main(int argc, char **argv)
 	pthread_t deal_msg_pid;
 	pthread_t deal_console_input_pid;
 	pthread_t maintain_ipcam_link_pid;
-
+#if _LINUX_
 	aeEventLoop *loop;
+#endif
 
 	SSRC = getpid();
 	IPCAM_DEV = create_empty_ipcam_link();
@@ -503,6 +506,8 @@ int main(int argc, char **argv)
 	pthread_join(deal_msg_pid, NULL);
 	pthread_join(deal_console_input_pid, NULL);
 
+#if _LINUX_
 	loop = aeCreateEventLoop();
+#endif
 	return 0;
 }
