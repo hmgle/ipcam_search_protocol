@@ -14,6 +14,7 @@
 #define sleep(n) Sleep(1000 * (n))
 #endif
 #include <pthread.h>
+#include <assert.h>
 #include "socket_wrap.h"
 #include "ipcam_message.h"
 #include "ipcam_list.h"
@@ -468,12 +469,38 @@ void *maintain_ipcam_link(void *p)
 	return NULL;
 }
 
+static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
+{
+	char line_buf[LINE_MAX] = {0};
+	char *curr_cmd = NULL;
+	int ret;
+
+#if _LINUX_
+	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+#else
+	fprintf(stdout, "ipc_shell> ");
+#endif
+	get_line(line_buf, sizeof(line_buf), stdin);
+	curr_cmd = strtok(line_buf, ";");
+	if (curr_cmd) {
+		ret = run_cmd_by_string(curr_cmd);
+	}
+
+	while ((curr_cmd = strtok(NULL, ";")) != NULL) {
+		ret = run_cmd_by_string(curr_cmd);
+		debug_print("run_cmd_by_string return %d", ret);
+	}
+#if _LINUX_
+	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+#else
+	fprintf(stdout, "ipc_shell> ");
+#endif
+	debug_print();
+}
+
 int main(int argc, char **argv)
 {
 	int ret;
-	pthread_t deal_msg_pid;
-	pthread_t deal_console_input_pid;
-	pthread_t maintain_ipcam_link_pid;
 #if _LINUX_
 	aeEventLoop *loop;
 #endif
@@ -481,22 +508,27 @@ int main(int argc, char **argv)
 	SSRC = getpid();
 	IPCAM_DEV = create_empty_ipcam_link();
 
+#if !_LINUX_
+	pthread_t deal_msg_pid;
+	pthread_t deal_console_input_pid;
+	pthread_t maintain_ipcam_link_pid;
+
 	ret = pthread_create(&deal_console_input_pid, 0, 
-						 deal_console_input, NULL);
+				deal_console_input, NULL);
 	if (ret) {
 		debug_print("pthread_create failed");
 		exit(errno);
 	}
 
 	ret = pthread_create(&deal_msg_pid, 0, 
-						 recv_msg_from_ipcam, NULL);
+				recv_msg_from_ipcam, NULL);
 	if (ret) {
 		debug_print("pthread_create failed");
 		exit(errno);
 	}
 
 	ret = pthread_create(&maintain_ipcam_link_pid, 0, 
-						 maintain_ipcam_link, NULL);
+				maintain_ipcam_link, NULL);
 	if (ret) {
 		debug_print("pthread_create failed");
 		exit(errno);
@@ -505,9 +537,11 @@ int main(int argc, char **argv)
 	pthread_join(maintain_ipcam_link_pid, NULL);
 	pthread_join(deal_msg_pid, NULL);
 	pthread_join(deal_console_input_pid, NULL);
-
-#if _LINUX_
+#else
 	loop = aeCreateEventLoop();
+	ret = aeCreateFileEvent(loop, STDIN_FILENO, AE_READABLE, dealcmd, NULL);
+	assert(ret != AE_ERR);
+	aeMain(loop);
 #endif
 	return 0;
 }
