@@ -85,9 +85,9 @@ void list_ipcam(ipcam_link ipcam_dev)
 	pipcam_node q = ipcam_dev->next;
 
 #if _LINUX_
-	printf("\033[01;33mALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n\033[0m");
+	fprintf(stdout, "\033[01;33mALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n\033[0m");
 #else
-	printf("ALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
+	fprintf(stdout, "ALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
 #endif
 	while (q) {
 		if (q->alive_flag & 1)
@@ -475,11 +475,6 @@ static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 	char *curr_cmd = NULL;
 	int ret;
 
-#if _LINUX_
-	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
-#else
-	fprintf(stdout, "ipc_shell> ");
-#endif
 	get_line(line_buf, sizeof(line_buf), stdin);
 	curr_cmd = strtok(line_buf, ";");
 	if (curr_cmd) {
@@ -495,7 +490,7 @@ static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 #else
 	fprintf(stdout, "ipc_shell> ");
 #endif
-	debug_print();
+	fflush(stdout);
 }
 
 int main(int argc, char **argv)
