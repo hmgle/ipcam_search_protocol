@@ -493,6 +493,53 @@ static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 	fflush(stdout);
 }
 
+static int init_server_fd(int port, char *bindaddr)
+{
+	int pc_server_fd;
+	struct sockaddr_in pc_server;
+	int ret;
+	int sock_opt;
+
+#if !_LINUX_
+	WSADATA wsadata;
+	if (WSAStartup(MAKEWORD(1, 1), &wsadata) == SOCKET_ERROR) {
+		debug_print("WSAStartup() fail\n");
+		exit(errno);
+	}
+#endif
+
+	pc_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (pc_server_fd == -1) {
+		debug_print("socket fail");
+		exit(errno);
+	}
+
+	sock_opt = 1;
+	ret = setsockopt(pc_server_fd, SOL_SOCKET, SO_REUSEADDR, 
+			 &sock_opt, sizeof(sock_opt));
+	if (ret < 0) {
+		debug_print("setsockopt fail");
+		exit(errno);
+	}
+
+	pc_server.sin_family = AF_INET;
+	pc_server.sin_port = htons(port);
+	pc_server.sin_addr.s_addr = htonl(INADDR_ANY);
+	if (bindaddr && inet_aton(bindaddr, &pc_server.sin_addr) == 0) {
+		debug_print("invalid bind address");
+		close(pc_server_fd);
+		return -1;
+	}
+
+	ret = bind(pc_server_fd, (struct sockaddr*)&pc_server,
+			   sizeof(pc_server));
+	if (ret == -1) {
+		debug_print("bind fail");
+		exit(errno);
+	}
+	return pc_server_fd;
+}
+
 int main(int argc, char **argv)
 {
 	int ret;
@@ -533,6 +580,10 @@ int main(int argc, char **argv)
 	pthread_join(deal_msg_pid, NULL);
 	pthread_join(deal_console_input_pid, NULL);
 #else
+	int pc_server_fd;
+
+	pc_server_fd = init_server_fd(PC_SERVER_PORT, "0.0.0.0");
+	assert(pc_server_fd > 0);
 	loop = aeCreateEventLoop();
 	ret = aeCreateFileEvent(loop, STDIN_FILENO, AE_READABLE, dealcmd, NULL);
 	assert(ret != AE_ERR);
