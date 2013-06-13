@@ -493,7 +493,7 @@ static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 	fflush(stdout);
 }
 
-static int init_server_fd(int port, char *bindaddr)
+static int init_server_UDP_fd(int port, char *bindaddr)
 {
 	int pc_server_fd;
 	struct sockaddr_in pc_server;
@@ -540,6 +540,32 @@ static int init_server_fd(int port, char *bindaddr)
 	return pc_server_fd;
 }
 
+static void dealnet(aeEventLoop *loop, int fd, void *privdata, int mask)
+{
+	struct sockaddr_in peer;
+	char buf[MAX_MSG_LEN];
+	struct ipcam_search_msg *msg_buf;
+	socklen_t len;
+	int ret;
+
+	len = sizeof(struct sockaddr_in);
+	ret = recvfrom(fd, buf, sizeof(buf), 0, 
+		   	(struct sockaddr *)&peer, (socklen_t *)&len);
+	if (ret < 0) {
+		debug_print("recvfrom fail");
+		return;
+	}
+	msg_buf = malloc(sizeof(struct ipcam_search_msg) 
+				 + ((struct ipcam_search_msg *)buf)->exten_len);
+	parse_msg(buf, ret, msg_buf);
+	deal_msg_func(msg_buf, &peer);
+
+	if (msg_buf) {
+		free(msg_buf);
+		msg_buf = NULL;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int ret;
@@ -582,10 +608,12 @@ int main(int argc, char **argv)
 #else
 	int pc_server_fd;
 
-	pc_server_fd = init_server_fd(PC_SERVER_PORT, "0.0.0.0");
+	pc_server_fd = init_server_UDP_fd(PC_SERVER_PORT, "0.0.0.0");
 	assert(pc_server_fd > 0);
 	loop = aeCreateEventLoop();
 	ret = aeCreateFileEvent(loop, STDIN_FILENO, AE_READABLE, dealcmd, NULL);
+	assert(ret != AE_ERR);
+	ret = aeCreateFileEvent(loop, pc_server_fd, AE_READABLE, dealnet, NULL);
 	assert(ret != AE_ERR);
 	aeMain(loop);
 #endif
