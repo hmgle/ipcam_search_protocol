@@ -14,6 +14,7 @@
 #define sleep(n) Sleep(1000 * (n))
 #endif
 #include <pthread.h>
+#include <assert.h>
 #include "socket_wrap.h"
 #include "ipcam_message.h"
 #include "ipcam_list.h"
@@ -84,9 +85,9 @@ void list_ipcam(ipcam_link ipcam_dev)
 	pipcam_node q = ipcam_dev->next;
 
 #if _LINUX_
-	printf("\033[01;33mALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n\033[0m");
+	fprintf(stdout, "\033[01;33mALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n\033[0m");
 #else
-	printf("ALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
+	fprintf(stdout, "ALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
 #endif
 	while (q) {
 		if (q->alive_flag & 1)
@@ -468,12 +469,106 @@ void *maintain_ipcam_link(void *p)
 	return NULL;
 }
 
+static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
+{
+	char line_buf[LINE_MAX] = {0};
+	char *curr_cmd = NULL;
+	int ret;
+
+	get_line(line_buf, sizeof(line_buf), stdin);
+	curr_cmd = strtok(line_buf, ";");
+	if (curr_cmd) {
+		ret = run_cmd_by_string(curr_cmd);
+	}
+
+	while ((curr_cmd = strtok(NULL, ";")) != NULL) {
+		ret = run_cmd_by_string(curr_cmd);
+		debug_print("run_cmd_by_string return %d", ret);
+	}
+#if _LINUX_
+	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+#else
+	fprintf(stdout, "ipc_shell> ");
+#endif
+	fflush(stdout);
+}
+
+static int init_server_UDP_fd(int port, char *bindaddr)
+{
+	int pc_server_fd;
+	struct sockaddr_in pc_server;
+	int ret;
+	int sock_opt;
+
+#if !_LINUX_
+	WSADATA wsadata;
+	if (WSAStartup(MAKEWORD(1, 1), &wsadata) == SOCKET_ERROR) {
+		debug_print("WSAStartup() fail\n");
+		exit(errno);
+	}
+#endif
+
+	pc_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (pc_server_fd == -1) {
+		debug_print("socket fail");
+		exit(errno);
+	}
+
+	sock_opt = 1;
+	ret = setsockopt(pc_server_fd, SOL_SOCKET, SO_REUSEADDR, 
+			 &sock_opt, sizeof(sock_opt));
+	if (ret < 0) {
+		debug_print("setsockopt fail");
+		exit(errno);
+	}
+
+	pc_server.sin_family = AF_INET;
+	pc_server.sin_port = htons(port);
+	pc_server.sin_addr.s_addr = htonl(INADDR_ANY);
+	if (bindaddr && inet_aton(bindaddr, &pc_server.sin_addr) == 0) {
+		debug_print("invalid bind address");
+		close(pc_server_fd);
+		return -1;
+	}
+
+	ret = bind(pc_server_fd, (struct sockaddr*)&pc_server,
+			   sizeof(pc_server));
+	if (ret == -1) {
+		debug_print("bind fail");
+		exit(errno);
+	}
+	return pc_server_fd;
+}
+
+static void dealnet(aeEventLoop *loop, int fd, void *privdata, int mask)
+{
+	struct sockaddr_in peer;
+	char buf[MAX_MSG_LEN];
+	struct ipcam_search_msg *msg_buf;
+	socklen_t len;
+	int ret;
+
+	len = sizeof(struct sockaddr_in);
+	ret = recvfrom(fd, buf, sizeof(buf), 0, 
+		   	(struct sockaddr *)&peer, (socklen_t *)&len);
+	if (ret < 0) {
+		debug_print("recvfrom fail");
+		return;
+	}
+	msg_buf = malloc(sizeof(struct ipcam_search_msg) 
+				 + ((struct ipcam_search_msg *)buf)->exten_len);
+	parse_msg(buf, ret, msg_buf);
+	deal_msg_func(msg_buf, &peer);
+
+	if (msg_buf) {
+		free(msg_buf);
+		msg_buf = NULL;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int ret;
-	pthread_t deal_msg_pid;
-	pthread_t deal_console_input_pid;
-	pthread_t maintain_ipcam_link_pid;
 #if _LINUX_
 	aeEventLoop *loop;
 #endif
@@ -481,22 +576,27 @@ int main(int argc, char **argv)
 	SSRC = getpid();
 	IPCAM_DEV = create_empty_ipcam_link();
 
+#if !_LINUX_
+	pthread_t deal_msg_pid;
+	pthread_t deal_console_input_pid;
+	pthread_t maintain_ipcam_link_pid;
+
 	ret = pthread_create(&deal_console_input_pid, 0, 
-						 deal_console_input, NULL);
+				deal_console_input, NULL);
 	if (ret) {
 		debug_print("pthread_create failed");
 		exit(errno);
 	}
 
 	ret = pthread_create(&deal_msg_pid, 0, 
-						 recv_msg_from_ipcam, NULL);
+				recv_msg_from_ipcam, NULL);
 	if (ret) {
 		debug_print("pthread_create failed");
 		exit(errno);
 	}
 
 	ret = pthread_create(&maintain_ipcam_link_pid, 0, 
-						 maintain_ipcam_link, NULL);
+				maintain_ipcam_link, NULL);
 	if (ret) {
 		debug_print("pthread_create failed");
 		exit(errno);
@@ -505,9 +605,17 @@ int main(int argc, char **argv)
 	pthread_join(maintain_ipcam_link_pid, NULL);
 	pthread_join(deal_msg_pid, NULL);
 	pthread_join(deal_console_input_pid, NULL);
+#else
+	int pc_server_fd;
 
-#if _LINUX_
+	pc_server_fd = init_server_UDP_fd(PC_SERVER_PORT, "0.0.0.0");
+	assert(pc_server_fd > 0);
 	loop = aeCreateEventLoop();
+	ret = aeCreateFileEvent(loop, STDIN_FILENO, AE_READABLE, dealcmd, NULL);
+	assert(ret != AE_ERR);
+	ret = aeCreateFileEvent(loop, pc_server_fd, AE_READABLE, dealnet, NULL);
+	assert(ret != AE_ERR);
+	aeMain(loop);
 #endif
 	return 0;
 }
