@@ -7,7 +7,7 @@ search ip cam on network.
 
 ## License
 
-在 MIT License 许可协议下发布， 参见 [LICENSE.md](LICENSE.md).
+在 BSD License 许可协议下发布， 参见 [LICENSE.md](LICENSE.md).
 
 ## 使用方法
 
