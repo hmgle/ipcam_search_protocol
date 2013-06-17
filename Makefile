@@ -3,7 +3,7 @@
 
 os =
 debug =
-PLATFORM =
+PLATFORM = linux
 EXESUF =
 CFLAGS = -Wall -fno-strict-aliasing
 LIBS = -lpthread
