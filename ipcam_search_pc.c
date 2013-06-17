@@ -611,6 +611,8 @@ int main(int argc, char **argv)
 	pc_server_fd = init_server_UDP_fd(PC_SERVER_PORT, "0.0.0.0");
 	assert(pc_server_fd > 0);
 	loop = aeCreateEventLoop();
+	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+	fflush(stdout);
 	ret = aeCreateFileEvent(loop, STDIN_FILENO, AE_READABLE, dealcmd, NULL);
 	assert(ret != AE_ERR);
 	ret = aeCreateFileEvent(loop, pc_server_fd, AE_READABLE, dealnet, NULL);
