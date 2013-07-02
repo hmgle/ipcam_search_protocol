@@ -110,7 +110,6 @@ void list_ipcam(ipcam_link ipcam_dev)
 		printf("%s\n", time_str);
 		q = q->next;
 	}
-
 	return;
 }
 
@@ -469,6 +468,34 @@ void *maintain_ipcam_link(void *p)
 	return NULL;
 }
 
+static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *clientData);
+static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *clientData);
+
+static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *clientData)
+{
+	debug_print("clear");
+	pthread_mutex_lock(&IPCAM_DEV_MUTEX);
+	clear_all_dev_online(IPCAM_DEV);
+	pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
+	aeCreateTimeEvent(loop, CHECK_IPCAM_CYCLE * 1000, watch_ipcam_link_test, NULL, NULL);
+	return -1;
+}
+
+static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *clientData)
+{
+	debug_print("test");
+	pthread_mutex_lock(&IPCAM_DEV_MUTEX);
+	test_all_dev_online(IPCAM_DEV);
+	pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
+
+	pthread_mutex_lock(&IPCAM_DEV_MUTEX);
+	clear_all_dev_online(IPCAM_DEV);
+	pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
+
+	aeCreateTimeEvent(loop, CHECK_IPCAM_CYCLE * 1000, watch_ipcam_link_test, NULL, NULL);
+	return -1;
+}
+
 static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 {
 	char line_buf[LINE_MAX] = {0};
@@ -617,6 +644,7 @@ int main(int argc, char **argv)
 	assert(ret != AE_ERR);
 	ret = aeCreateFileEvent(loop, pc_server_fd, AE_READABLE, dealnet, NULL);
 	assert(ret != AE_ERR);
+	aeCreateTimeEvent(loop, CHECK_IPCAM_CYCLE * 1000, watch_ipcam_link_clear, NULL, NULL);
 	aeMain(loop);
 #endif
 	return 0;
