@@ -492,8 +492,7 @@ static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *c
 	clear_all_dev_online(IPCAM_DEV);
 	pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 
-	aeCreateTimeEvent(loop, CHECK_IPCAM_CYCLE * 1000, watch_ipcam_link_test, NULL, NULL);
-	return -1;
+	return CHECK_IPCAM_CYCLE * 1000;
 }
 
 static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
