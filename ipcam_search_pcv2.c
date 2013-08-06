@@ -5,15 +5,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/types.h>
-#if _LINUX_
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#else
-#include <windows.h>
-#define sleep(n) Sleep(1000 * (n))
-#endif
-#include <pthread.h>
 #include <assert.h>
 #include "socket_wrap.h"
 #include "ipcam_message.h"
@@ -21,10 +15,8 @@
 #include "para_parse.h"
 #include "debug_print.h"
 
-#if _LINUX_
 #include "ae.c"
 #include "anet.c"
-#endif
 
 #ifndef LINE_MAX
 #define LINE_MAX            2048
@@ -38,21 +30,20 @@
 static ipcam_link IPCAM_DEV;
 static uint32_t SSRC;
 
-static pthread_mutex_t IPCAM_DEV_MUTEX = PTHREAD_MUTEX_INITIALIZER;
-
 void list_ipcam(ipcam_link ipcam_dev);
-int run_cmd_by_string(char *cmd_string);
+int run_cmd_by_string(aeEventLoop *loop, char *cmd_string);
 static void search_ipcam(void);
 static char *get_line(char *s, size_t n, FILE *f);
 void ctrl_c(int signo);
 void deal_console_input_sig_init(void);
 void release_exit(int signo);
-void *deal_console_input(void *p);
-void *recv_msg_from_ipcam(void *p);
 static void clear_all_dev_online(ipcam_link IPCAM_DEV);
 static void test_all_dev_online(ipcam_link IPCAM_DEV);
-void *maintain_ipcam_link(void *p);
 static void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
+static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *clientData);
+static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *clientData);
+
+static int callback_list_ipcam(struct aeEventLoop *loop, long long id, void *clientData);
 #if 0
 struct ipcam_search_msg {
     uint8_t     type;
@@ -84,11 +75,7 @@ void list_ipcam(ipcam_link ipcam_dev)
 	char time_str[128] = {0};
 	pipcam_node q = ipcam_dev->next;
 
-#if _LINUX_
 	fprintf(stdout, "\033[01;33mALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n\033[0m");
-#else
-	fprintf(stdout, "ALIVE?\tIP ADDR\t\tDEV NAME\t\tMAC\t\tSTARTUP TIME\n");
-#endif
 	while (q) {
 		if (q->alive_flag & 1)
 			printf("yes\t");
@@ -113,22 +100,20 @@ void list_ipcam(ipcam_link ipcam_dev)
 	return;
 }
 
-int run_cmd_by_string(char *cmd_string)
+int run_cmd_by_string(aeEventLoop *loop, char *cmd_string)
 {
 	int ret = -1;
 
 	switch (cmd_string[0]) {
 	case 'r': /* renew ipcam list */
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 		delete_ipcam_all_node(IPCAM_DEV);
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 	case 's':   /* search ipcam dev */
 		search_ipcam();
-		sleep(1);
+		// sleep(1);
+		aeCreateTimeEvent(loop, 1 * 1000, callback_list_ipcam, NULL, NULL);
+		break;
 	case 'l':   /* list ipcam dev */
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 		list_ipcam(IPCAM_DEV);
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 		break;
 	case 'q':
 		release_exit(0);
@@ -201,41 +186,6 @@ void deal_console_input_sig_init(void)
 	return;
 }
 
-void *deal_console_input(void *p)
-{
-	char line_buf[LINE_MAX] = {0};
-	char *curr_cmd = NULL;
-	int ret;
-
-	deal_console_input_sig_init();
-	fprintf(stdout, "Hello, This is ipc_shell\n"
-			"type \"help\" for help\n");
-#if _LINUX_
-	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
-#else
-	fprintf(stdout, "ipc_shell> ");
-#endif
-	while (get_line(line_buf, sizeof(line_buf), stdin)) {
-		curr_cmd = strtok(line_buf, ";");
-		if (curr_cmd) {
-			ret = run_cmd_by_string(curr_cmd);
-		}
-
-		while ((curr_cmd = strtok(NULL, ";")) != NULL) {
-			ret = run_cmd_by_string(curr_cmd);
-			debug_print("run_cmd_by_string return %d", ret);
-		}
-#if _LINUX_
-		fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
-#else
-		fprintf(stdout, "ipc_shell> ");
-#endif
-	} /* while (get_line(line_buf, sizeof(line_buf), stdin)) */
-	fprintf(stdout, "Good-bye \n");
-	release_exit(0);
-	return NULL;
-} /* void *deal_console_input(void *p) */
-
 static void deal_msg_func(const struct ipcam_search_msg *msg, 
 						  const struct sockaddr_in *from)
 {
@@ -269,7 +219,6 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
 		new_ipcam_node.node_info = remote_ipcam_info;
 		new_ipcam_node.alive_flag = 1;
 
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 		ret = insert_nodulp_ipcam_node(IPCAM_DEV, &new_ipcam_node);
 		if (!ret) {
 			tmp_node 
@@ -278,17 +227,14 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
 			tmp_node->alive_flag = 1;
 		}
 		debug_print("insert return %d", ret);
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 
 		break;
 	case IPCAMMSG_LOGOUT:
 		debug_print("recv IPCAMMSG_LOGOUT msg");
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 		ret = delete_ipcam_node_by_mac(IPCAM_DEV, msg->exten_msg);
 		if (!ret)
 			debug_print("it work badly");
 
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 		break;
 	case IPCAMMSG_HEARTBEAT:
 		memcpy(&remote_ipcam_info.ipaddr, 
@@ -307,14 +253,12 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
 		new_ipcam_node.node_info = remote_ipcam_info;
 		new_ipcam_node.alive_flag = 1;
 
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 		ret = insert_nodulp_ipcam_node(IPCAM_DEV, &new_ipcam_node);
 		if (!ret) {
 			tmp_node = search_ipcam_node_by_mac(IPCAM_DEV, 
 					remote_ipcam_info.mac);
 			tmp_node->alive_flag = 1;
 		}
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 
 		break;
 	case IPCAMMSG_ACK_ALIVE:
@@ -341,7 +285,6 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
 		new_ipcam_node.node_info = remote_ipcam_info;
 		new_ipcam_node.alive_flag = 1;
 
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 		ret = insert_nodulp_ipcam_node(IPCAM_DEV, &new_ipcam_node);
 		if (!ret) {
 			tmp_node 
@@ -349,8 +292,6 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
 						       remote_ipcam_info.mac);
 			tmp_node->alive_flag = 1;
 		}
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
-
 		break;
 	case IPCAMMSG_ACK_DHCP:
 		break;
@@ -362,73 +303,6 @@ static void deal_msg_func(const struct ipcam_search_msg *msg,
 
 	return;
 } /* static void deal_msg_func() */
-
-void *recv_msg_from_ipcam(void *p)
-{
-	int pc_server_fd;
-	struct sockaddr_in pc_server;
-	struct sockaddr_in peer;
-	char buf[MAX_MSG_LEN];
-	struct ipcam_search_msg *msg_buf;
-	socklen_t len;
-	int ret;
-	int sock_opt;
-
-#if !_LINUX_
-	WSADATA wsadata;
-	if (WSAStartup(MAKEWORD(1, 1), &wsadata) == SOCKET_ERROR) {
-		debug_print("WSAStartup() fail\n");
-		exit(errno);
-	}
-#endif
-
-	pc_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (pc_server_fd == -1) {
-		debug_print("socket fail");
-		exit(errno);
-	}
-
-	sock_opt = 1;
-	ret = setsockopt(pc_server_fd, SOL_SOCKET, SO_REUSEADDR, 
-			 &sock_opt, sizeof(sock_opt));
-	if (ret < 0) {
-		debug_print("setsockopt fail");
-		exit(errno);
-	}
-
-	pc_server.sin_family = AF_INET;
-	pc_server.sin_port = htons(PC_SERVER_PORT);
-	pc_server.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	ret = bind(pc_server_fd, (struct sockaddr*)&pc_server,
-			   sizeof(pc_server));
-	if (ret == -1) {
-		debug_print("bind fail");
-		exit(errno);
-	}
-
-	while (1) {
-		len = sizeof(struct sockaddr_in);
-		ret = recvfrom(pc_server_fd, buf, sizeof(buf), 0, 
-					   (struct sockaddr *)&peer, 
-					   (socklen_t *)&len);
-		if (ret < 0) {
-			debug_print("recvfrom fail");
-			continue;
-		}
-		msg_buf = malloc(sizeof(struct ipcam_search_msg) 
-						 + ((struct ipcam_search_msg *)buf)->exten_len);
-		parse_msg(buf, ret, msg_buf);
-		deal_msg_func(msg_buf, &peer);
-
-		if (msg_buf) {
-			free(msg_buf);
-			msg_buf = NULL;
-		}
-	} /* while (1) */
-
-	return NULL;
-} /* void *recv_msg_from_ipcam(void *p) */
 
 static void clear_all_dev_online(ipcam_link IPCAM_DEV)
 {
@@ -451,32 +325,10 @@ static void test_all_dev_online(ipcam_link IPCAM_DEV)
 	}
 }
 
-void *maintain_ipcam_link(void *p)
-{
-	while (1) {
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
-		clear_all_dev_online(IPCAM_DEV);
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
-
-		sleep(CHECK_IPCAM_CYCLE);
-
-		pthread_mutex_lock(&IPCAM_DEV_MUTEX);
-		test_all_dev_online(IPCAM_DEV);
-		pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
-	}
-
-	return NULL;
-}
-
-static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *clientData);
-static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *clientData);
-
 static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *clientData)
 {
 	debug_print("clear");
-	pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 	clear_all_dev_online(IPCAM_DEV);
-	pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 	aeCreateTimeEvent(loop, CHECK_IPCAM_CYCLE * 1000, watch_ipcam_link_test, NULL, NULL);
 	return -1;
 }
@@ -484,15 +336,17 @@ static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *
 static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *clientData)
 {
 	debug_print("test");
-	pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 	test_all_dev_online(IPCAM_DEV);
-	pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 
-	pthread_mutex_lock(&IPCAM_DEV_MUTEX);
 	clear_all_dev_online(IPCAM_DEV);
-	pthread_mutex_unlock(&IPCAM_DEV_MUTEX);
 
 	return CHECK_IPCAM_CYCLE * 1000;
+}
+
+static int callback_list_ipcam(struct aeEventLoop *loop, long long id, void *clientData)
+{
+	list_ipcam(IPCAM_DEV);
+	return -1;
 }
 
 static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
@@ -504,18 +358,14 @@ static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 	get_line(line_buf, sizeof(line_buf), stdin);
 	curr_cmd = strtok(line_buf, ";");
 	if (curr_cmd) {
-		ret = run_cmd_by_string(curr_cmd);
+		ret = run_cmd_by_string(loop, curr_cmd);
 	}
 
 	while ((curr_cmd = strtok(NULL, ";")) != NULL) {
-		ret = run_cmd_by_string(curr_cmd);
+		ret = run_cmd_by_string(loop, curr_cmd);
 		debug_print("run_cmd_by_string return %d", ret);
 	}
-#if _LINUX_
 	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
-#else
-	fprintf(stdout, "ipc_shell> ");
-#endif
 	fflush(stdout);
 }
 
@@ -525,14 +375,6 @@ static int init_server_UDP_fd(int port, char *bindaddr)
 	struct sockaddr_in pc_server;
 	int ret;
 	int sock_opt;
-
-#if !_LINUX_
-	WSADATA wsadata;
-	if (WSAStartup(MAKEWORD(1, 1), &wsadata) == SOCKET_ERROR) {
-		debug_print("WSAStartup() fail\n");
-		exit(errno);
-	}
-#endif
 
 	pc_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (pc_server_fd == -1) {
@@ -595,43 +437,11 @@ static void dealnet(aeEventLoop *loop, int fd, void *privdata, int mask)
 int main(int argc, char **argv)
 {
 	int ret;
-#if _LINUX_
 	aeEventLoop *loop;
-#endif
 
 	SSRC = getpid();
 	IPCAM_DEV = create_empty_ipcam_link();
 
-#if !_LINUX_
-	pthread_t deal_msg_pid;
-	pthread_t deal_console_input_pid;
-	pthread_t maintain_ipcam_link_pid;
-
-	ret = pthread_create(&deal_console_input_pid, 0, 
-				deal_console_input, NULL);
-	if (ret) {
-		debug_print("pthread_create failed");
-		exit(errno);
-	}
-
-	ret = pthread_create(&deal_msg_pid, 0, 
-				recv_msg_from_ipcam, NULL);
-	if (ret) {
-		debug_print("pthread_create failed");
-		exit(errno);
-	}
-
-	ret = pthread_create(&maintain_ipcam_link_pid, 0, 
-				maintain_ipcam_link, NULL);
-	if (ret) {
-		debug_print("pthread_create failed");
-		exit(errno);
-	}
-
-	pthread_join(maintain_ipcam_link_pid, NULL);
-	pthread_join(deal_msg_pid, NULL);
-	pthread_join(deal_console_input_pid, NULL);
-#else
 	int pc_server_fd;
 
 	pc_server_fd = init_server_UDP_fd(PC_SERVER_PORT, "0.0.0.0");
@@ -645,6 +455,5 @@ int main(int argc, char **argv)
 	assert(ret != AE_ERR);
 	aeCreateTimeEvent(loop, CHECK_IPCAM_CYCLE * 1000, watch_ipcam_link_clear, NULL, NULL);
 	aeMain(loop);
-#endif
 	return 0;
 }

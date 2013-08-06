@@ -3,5 +3,6 @@
 *.tmp
 ipcam_search_device
 ipcam_search_pc
+ipcam_search_pcv2
 get_mac_test.c
 tags
