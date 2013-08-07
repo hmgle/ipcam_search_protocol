@@ -114,9 +114,13 @@ int run_cmd_by_string(aeEventLoop *loop, char *cmd_string)
 		break;
 	case 'l':   /* list ipcam dev */
 		list_ipcam(IPCAM_DEV);
+		fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+		fflush(stdout);
 		break;
 	case 'q':
 		release_exit(0);
+		fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+		fflush(stdout);
 		break;
 	case 'h':
 	default:
@@ -126,9 +130,10 @@ int run_cmd_by_string(aeEventLoop *loop, char *cmd_string)
 		printf("\'q\': quit\n");
 		printf("setipcname?ip=ip&name=name\n");
 		printf("\'h\': show this help\n");
+		fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+		fflush(stdout);
 		break;
 	} /* switch (cmd_string[0]) */
-
 	return ret;
 }
 
@@ -346,6 +351,8 @@ static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *c
 static int callback_list_ipcam(struct aeEventLoop *loop, long long id, void *clientData)
 {
 	list_ipcam(IPCAM_DEV);
+	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+	fflush(stdout);
 	return -1;
 }
 
@@ -365,8 +372,6 @@ static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 		ret = run_cmd_by_string(loop, curr_cmd);
 		debug_print("run_cmd_by_string return %d", ret);
 	}
-	fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
-	fflush(stdout);
 }
 
 static int init_server_UDP_fd(int port, char *bindaddr)
