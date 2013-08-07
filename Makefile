@@ -37,7 +37,7 @@ CC := $(CROSS_COMPILE)$(CC)
 STRIP ?= strip
 STRIP := $(CROSS_COMPILE)$(STRIP)
 
-TARGET = ipcam_search_pc ipcam_search_device
+TARGET = ipcam_search_pc ipcam_search_device ipcam_search_pcv2
 
 .PHONY: all clean
 
@@ -52,6 +52,13 @@ ipcam_search_pc: ipcam_search_pc.o ipcam_list.o ipcam_message.o \
 
 ipcam_search_pc.o: ipcam_search_pc.c ipcam_message.h debug_print.h \
 		   para_parse.o
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+ipcam_search_pcv2: ipcam_search_pcv2.o ipcam_list.o ipcam_message.o \
+				 socket_wrap.o para_parse.o
+	$(CC) -o $@ $^
+
+ipcam_search_pcv2.o: ipcam_search_pcv2.c ipcam_message.h debug_print.h
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 ipcam_list.o: ipcam_list.c ipcam_list.h debug_print.h
