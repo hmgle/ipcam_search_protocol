@@ -13,6 +13,7 @@
 #include "ipcam_message.h"
 #include "ipcam_list.h"
 #include "para_parse.h"
+#include "already_running.h"
 #include "debug_print.h"
 
 #include "ae.c"
@@ -192,7 +193,7 @@ void deal_console_input_sig_init(void)
 }
 
 static void deal_msg_func(const struct ipcam_search_msg *msg, 
-						  const struct sockaddr_in *from)
+			  const struct sockaddr_in *from)
 {
 	int ret;
 	ipcam_info_t remote_ipcam_info;
@@ -443,6 +444,11 @@ int main(int argc, char **argv)
 {
 	int ret;
 	aeEventLoop *loop;
+
+	if (already_running()) {
+		fprintf(stderr, "already running!\n");
+		exit(1);
+	}
 
 	SSRC = getpid();
 	IPCAM_DEV = create_empty_ipcam_link();

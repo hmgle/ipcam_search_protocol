@@ -55,7 +55,7 @@ ipcam_search_pc.o: ipcam_search_pc.c ipcam_message.h debug_print.h \
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 ipcam_search_pcv2: ipcam_search_pcv2.o ipcam_list.o ipcam_message.o \
-				 socket_wrap.o para_parse.o
+			 socket_wrap.o para_parse.o already_running.o
 	$(CC) -o $@ $^
 
 ipcam_search_pcv2.o: ipcam_search_pcv2.c ipcam_message.h debug_print.h
@@ -81,6 +81,9 @@ get_mac.o: get_mac.c get_mac.h
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 ipcam_message.o: ipcam_message.c ipcam_message.h
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+already_running.o: already_running.c already_running.h
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 get_mac.h: debug_print.h

@@ -1,6 +1,7 @@
 *.o
 *.log
 *.tmp
+*.pid
 ipcam_search_device
 ipcam_search_pc
 ipcam_search_pcv2
