@@ -197,68 +197,16 @@ static void send_logout_msg(void)
 		debug_log("broadcast_msg fail");
 }
 
-#if 0
-static void send_heartbeat_msg(void)
-{
-	int ret;
-	struct ipcam_search_msg heartbeat_msg;
-	uint8_t buf[MAX_MSG_LEN];
-
-	memset(&heartbeat_msg, 0, sizeof(heartbeat_msg));
-
-	heartbeat_msg.type = IPCAMMSG_HEARTBEAT;
-	heartbeat_msg.ssrc = SSRC;
-	heartbeat_msg.timestamp = time(NULL);
-	heartbeat_msg.heartbeat_num = 0;
-	get_ipcam_name(heartbeat_msg.ipcam_name);
-
-	memcpy(buf, &heartbeat_msg, sizeof(heartbeat_msg));
-	memcpy(buf + sizeof(heartbeat_msg), IPCAM_MAC, sizeof(IPCAM_MAC));
-	memcpy(buf + sizeof(heartbeat_msg) + sizeof(IPCAM_MAC), &STARTUP_TIME, 
-			sizeof(STARTUP_TIME));
-	((struct ipcam_search_msg *)buf)->exten_len = sizeof(IPCAM_MAC)
-						+ sizeof(STARTUP_TIME);
-
-	while (1) {
-		ret = broadcast_msg(PC_SERVER_PORT, buf, 
-				sizeof(heartbeat_msg) + ((struct ipcam_search_msg *)buf)->exten_len);
-		if (ret < 0)
-			debug_log("broadcast_msg fail");
-
-		((struct ipcam_search_msg *)buf)->heartbeat_num++;
-		sleep(HEARTBEAT_CYCLE);
-	} /* while (1) */
-}
-#endif
-
 static int send_heartbeat_msg(struct aeEventLoop *loop, long long id, void *clientData)
 {
 	int ret;
-	struct ipcam_search_msg heartbeat_msg;
-	uint8_t buf[MAX_MSG_LEN];
 
-	memset(&heartbeat_msg, 0, sizeof(heartbeat_msg));
-
-	heartbeat_msg.type = IPCAMMSG_HEARTBEAT;
-	heartbeat_msg.ssrc = SSRC;
-	heartbeat_msg.timestamp = time(NULL);
-	heartbeat_msg.heartbeat_num = 0;
-	get_ipcam_name(heartbeat_msg.ipcam_name);
-
-	memcpy(buf, &heartbeat_msg, sizeof(heartbeat_msg));
-	memcpy(buf + sizeof(heartbeat_msg), IPCAM_MAC, sizeof(IPCAM_MAC));
-	memcpy(buf + sizeof(heartbeat_msg) + sizeof(IPCAM_MAC), &STARTUP_TIME, 
-			sizeof(STARTUP_TIME));
-	((struct ipcam_search_msg *)buf)->exten_len = sizeof(IPCAM_MAC)
-						+ sizeof(STARTUP_TIME);
-
-
-	ret = broadcast_msg(PC_SERVER_PORT, buf, 
-			sizeof(heartbeat_msg) + ((struct ipcam_search_msg *)buf)->exten_len);
+	ret = broadcast_msg(PC_SERVER_PORT, clientData, 
+			sizeof(struct ipcam_search_msg) + ((struct ipcam_search_msg *)clientData)->exten_len);
 	if (ret < 0)
 		debug_log("broadcast_msg fail");
 
-	((struct ipcam_search_msg *)buf)->heartbeat_num++;
+	((struct ipcam_search_msg *)clientData)->heartbeat_num++;
 	return HEARTBEAT_CYCLE * 1000;
 }
 
@@ -364,8 +312,27 @@ int main(int argc, char **argv)
 		exit(errno);
 	}
 
+	uint8_t buf[MAX_MSG_LEN];
+	struct ipcam_search_msg heartbeat_msg;
+
+	memset(&heartbeat_msg, 0, sizeof(heartbeat_msg));
+
+	heartbeat_msg.type = IPCAMMSG_HEARTBEAT;
+	heartbeat_msg.ssrc = SSRC;
+	heartbeat_msg.timestamp = time(NULL);
+	heartbeat_msg.heartbeat_num = 0;
+	get_ipcam_name(heartbeat_msg.ipcam_name);
+
+	memcpy(buf, &heartbeat_msg, sizeof(heartbeat_msg));
+	memcpy(buf + sizeof(heartbeat_msg), IPCAM_MAC, sizeof(IPCAM_MAC));
+	memcpy(buf + sizeof(heartbeat_msg) + sizeof(IPCAM_MAC), &STARTUP_TIME, 
+			sizeof(STARTUP_TIME));
+	((struct ipcam_search_msg *)buf)->exten_len = sizeof(IPCAM_MAC)
+						+ sizeof(STARTUP_TIME);
+
+
 	loop = aeCreateEventLoop();
-	aeCreateTimeEvent(loop, HEARTBEAT_CYCLE * 1000, send_heartbeat_msg, NULL, NULL);
+	aeCreateTimeEvent(loop, HEARTBEAT_CYCLE * 1000, send_heartbeat_msg, NULL, (void *)buf);
 	aeMain(loop);
 
 	pthread_join(deal_msg_pid, NULL);
