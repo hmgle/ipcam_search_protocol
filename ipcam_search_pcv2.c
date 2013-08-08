@@ -35,8 +35,6 @@ static void list_ipcam(ipcam_link ipcam_dev);
 static int run_cmd_by_string(aeEventLoop *loop, char *cmd_string);
 static void search_ipcam(void);
 static char *get_line(char *s, size_t n, FILE *f);
-static void ctrl_c(int signo);
-static void deal_console_input_sig_init(void);
 static void release_exit(int signo);
 static void clear_all_dev_online(ipcam_link IPCAM_DEV);
 static void test_all_dev_online(ipcam_link IPCAM_DEV);
@@ -166,13 +164,6 @@ static char *get_line(char *s, size_t n, FILE *f)
 	return p;
 }
 
-static void ctrl_c(int signo)
-{
-	fprintf(stdout, "\nGood-bye \n");
-	release_exit(0);
-	return;
-}
-
 static void release_exit(int signo)
 {
 	/*
@@ -184,12 +175,6 @@ static void release_exit(int signo)
 	 * exit
 	 */
 	exit(signo);
-}
-
-static void deal_console_input_sig_init(void)
-{
-	signal(SIGINT, ctrl_c);
-	return;
 }
 
 static void deal_msg_func(const struct ipcam_search_msg *msg, 
@@ -333,7 +318,6 @@ static void test_all_dev_online(ipcam_link IPCAM_DEV)
 
 static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *clientData)
 {
-	debug_print("clear");
 	clear_all_dev_online(IPCAM_DEV);
 	aeCreateTimeEvent(loop, CHECK_IPCAM_CYCLE * 1000, watch_ipcam_link_test, NULL, NULL);
 	return -1;
@@ -341,11 +325,8 @@ static int watch_ipcam_link_clear(struct aeEventLoop *loop, long long id, void *
 
 static int watch_ipcam_link_test(struct aeEventLoop *loop, long long id, void *clientData)
 {
-	debug_print("test");
 	test_all_dev_online(IPCAM_DEV);
-
 	clear_all_dev_online(IPCAM_DEV);
-
 	return CHECK_IPCAM_CYCLE * 1000;
 }
 
