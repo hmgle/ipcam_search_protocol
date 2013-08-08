@@ -6,7 +6,11 @@
 
 #define LOCKMODE	(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
-char *get_cur_proc_basename(char *cur_proc_basename, size_t bufsiz)
+static char *get_cur_proc_basename(char *cur_proc_basename, size_t bufsiz);
+static char *get_cur_proc_dir(char *cur_proc_dir, size_t bufsiz);
+static int lockfile(int fd);
+
+static char *get_cur_proc_basename(char *cur_proc_basename, size_t bufsiz)
 {
 	int count;
 
@@ -21,7 +25,7 @@ char *get_cur_proc_basename(char *cur_proc_basename, size_t bufsiz)
 	return cur_proc_basename;
 }
 
-char *get_cur_proc_dir(char *cur_proc_dir, size_t bufsiz)
+static char *get_cur_proc_dir(char *cur_proc_dir, size_t bufsiz)
 {
 	int count;
 
@@ -37,7 +41,7 @@ char *get_cur_proc_dir(char *cur_proc_dir, size_t bufsiz)
 	return cur_proc_dir;
 }
 
-int lockfile(int fd)
+static int lockfile(int fd)
 {
 	struct flock fl;
 
