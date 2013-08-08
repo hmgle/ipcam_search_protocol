@@ -111,7 +111,7 @@ int run_cmd_by_string(aeEventLoop *loop, char *cmd_string)
 	case 's':   /* search ipcam dev */
 		search_ipcam();
 		// sleep(1);
-		aeCreateTimeEvent(loop, 1 * 1000, callback_list_ipcam, NULL, NULL);
+		aeCreateTimeEvent(loop, 1 * 150, callback_list_ipcam, NULL, NULL);
 		break;
 	case 'l':   /* list ipcam dev */
 		list_ipcam(IPCAM_DEV);
