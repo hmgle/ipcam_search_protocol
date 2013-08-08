@@ -9,7 +9,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <time.h>
 #include "ipcam_message.h"
 #include "socket_wrap.h"
@@ -35,7 +34,8 @@ static uint8_t IPCAM_MAC[6];
 int initsocket(void);
 static void replay_alive_msg(const struct ipcam_search_msg *recv_msg, const struct sockaddr_in *from);
 static void ipcam_deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
-static void *recv_msg_from_pc(void *p);
+/* static void *recv_msg_from_pc(void *p); */
+static void recv_msg_from_pc(aeEventLoop *loop, int fd, void *privdata, int mask);
 void broadcast_login_msg(void);
 static int send_heartbeat_msg(struct aeEventLoop *loop, long long id, void *clientData);
 static void send_logout_msg(void);
@@ -111,6 +111,7 @@ static void ipcam_deal_msg_func(const struct ipcam_search_msg *msg, const struct
 	return;
 }
 
+#if 0
 static void *recv_msg_from_pc(void *p)
 {
 	int ret;
@@ -139,6 +140,34 @@ static void *recv_msg_from_pc(void *p)
 		}
 	}
 	return NULL;
+}
+#endif
+
+static void recv_msg_from_pc(aeEventLoop *loop, int fd, void *privdata, int mask)
+{
+	int ret;
+	struct sockaddr_in peer;
+	uint8_t buf[MAX_MSG_LEN];
+	struct ipcam_search_msg *msg_buf;
+	socklen_t len;
+
+	len = sizeof(struct sockaddr_in);
+	ret = recvfrom(IPCAM_SERVER_FD, buf, sizeof(buf), 0, 
+				   (struct sockaddr *)&peer, 
+				   (socklen_t *)&len);
+	if (ret < 0) {
+		debug_log("recvfrom fail");
+		return;
+	}
+	msg_buf = malloc(sizeof(struct ipcam_search_msg) 
+			 + ((struct ipcam_search_msg *)buf)->exten_len);
+	parse_msg((const char *)buf, ret, msg_buf);
+	ipcam_deal_msg_func(msg_buf, &peer);
+
+	if (msg_buf) {
+		free(msg_buf);
+		msg_buf = NULL;
+	}
 }
 
 void broadcast_login_msg(void)
@@ -235,7 +264,6 @@ int main(int argc, char **argv)
 	int devnullfd;
 	struct sigaction sa;
 #endif
-	pthread_t deal_msg_pid;
 
 	signal(SIGINT, release_exit);
 	signal(SIGTERM, release_exit);
@@ -306,12 +334,6 @@ int main(int argc, char **argv)
 	initsocket();
 	broadcast_login_msg();
 
-	ret = pthread_create(&deal_msg_pid, 0, recv_msg_from_pc, NULL);
-	if (ret) {
-		debug_log("pthread_create failed");
-		exit(errno);
-	}
-
 	uint8_t buf[MAX_MSG_LEN];
 	struct ipcam_search_msg heartbeat_msg;
 
@@ -332,10 +354,10 @@ int main(int argc, char **argv)
 
 
 	loop = aeCreateEventLoop();
+	aeCreateFileEvent(loop, IPCAM_SERVER_FD, AE_READABLE, recv_msg_from_pc, NULL);
 	aeCreateTimeEvent(loop, HEARTBEAT_CYCLE * 1000, send_heartbeat_msg, NULL, (void *)buf);
 	aeMain(loop);
 
-	pthread_join(deal_msg_pid, NULL);
 	close_debug_log();
 
 	return 0;

@@ -31,6 +31,7 @@
 static ipcam_link IPCAM_DEV;
 static uint32_t SSRC;
 
+static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask);
 static void list_ipcam(ipcam_link ipcam_dev);
 static int run_cmd_by_string(aeEventLoop *loop, char *cmd_string);
 static void search_ipcam(void);

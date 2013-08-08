@@ -71,7 +71,7 @@ ipcam_search_device: ipcam_search_device.o get_mac.o ipcam_message.o \
 
 ipcam_search_devicev2: ipcam_search_devicev2.o get_mac.o ipcam_message.o \
 			socket_wrap.o config_ipcam_info.o para_parse.o
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) -o $@ $^
 
 para_parse.o: para_parse.c para_parse.h
 	$(CC) -c -o $@ $< $(CFLAGS)
