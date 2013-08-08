@@ -31,13 +31,13 @@
 static ipcam_link IPCAM_DEV;
 static uint32_t SSRC;
 
-void list_ipcam(ipcam_link ipcam_dev);
-int run_cmd_by_string(aeEventLoop *loop, char *cmd_string);
+static void list_ipcam(ipcam_link ipcam_dev);
+static int run_cmd_by_string(aeEventLoop *loop, char *cmd_string);
 static void search_ipcam(void);
 static char *get_line(char *s, size_t n, FILE *f);
-void ctrl_c(int signo);
-void deal_console_input_sig_init(void);
-void release_exit(int signo);
+static void ctrl_c(int signo);
+static void deal_console_input_sig_init(void);
+static void release_exit(int signo);
 static void clear_all_dev_online(ipcam_link IPCAM_DEV);
 static void test_all_dev_online(ipcam_link IPCAM_DEV);
 static void deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
@@ -71,7 +71,7 @@ enum {
 } ipcam_search_msg_type;
 #endif
 
-void list_ipcam(ipcam_link ipcam_dev)
+static void list_ipcam(ipcam_link ipcam_dev)
 {
 	char time_str[128] = {0};
 	pipcam_node q = ipcam_dev->next;
@@ -101,7 +101,7 @@ void list_ipcam(ipcam_link ipcam_dev)
 	return;
 }
 
-int run_cmd_by_string(aeEventLoop *loop, char *cmd_string)
+static int run_cmd_by_string(aeEventLoop *loop, char *cmd_string)
 {
 	int ret = -1;
 
@@ -166,14 +166,14 @@ static char *get_line(char *s, size_t n, FILE *f)
 	return p;
 }
 
-void ctrl_c(int signo)
+static void ctrl_c(int signo)
 {
 	fprintf(stdout, "\nGood-bye \n");
 	release_exit(0);
 	return;
 }
 
-void release_exit(int signo)
+static void release_exit(int signo)
 {
 	/*
 	 * release resources
@@ -186,7 +186,7 @@ void release_exit(int signo)
 	exit(signo);
 }
 
-void deal_console_input_sig_init(void)
+static void deal_console_input_sig_init(void)
 {
 	signal(SIGINT, ctrl_c);
 	return;
