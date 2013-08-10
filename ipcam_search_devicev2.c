@@ -34,7 +34,6 @@ static uint8_t IPCAM_MAC[6];
 int initsocket(void);
 static void replay_alive_msg(const struct ipcam_search_msg *recv_msg, const struct sockaddr_in *from);
 static void ipcam_deal_msg_func(const struct ipcam_search_msg *msg, const struct sockaddr_in *from);
-/* static void *recv_msg_from_pc(void *p); */
 static void recv_msg_from_pc(aeEventLoop *loop, int fd, void *privdata, int mask);
 void broadcast_login_msg(void);
 static int send_heartbeat_msg(struct aeEventLoop *loop, long long id, void *clientData);
@@ -110,38 +109,6 @@ static void ipcam_deal_msg_func(const struct ipcam_search_msg *msg, const struct
 
 	return;
 }
-
-#if 0
-static void *recv_msg_from_pc(void *p)
-{
-	int ret;
-	struct sockaddr_in peer;
-	uint8_t buf[MAX_MSG_LEN];
-	struct ipcam_search_msg *msg_buf;
-	socklen_t len;
-
-	while (1) {
-		len = sizeof(struct sockaddr_in);
-		ret = recvfrom(IPCAM_SERVER_FD, buf, sizeof(buf), 0, 
-					   (struct sockaddr *)&peer, 
-					   (socklen_t *)&len);
-		if (ret < 0) {
-			debug_log("recvfrom fail");
-			continue;
-		}
-		msg_buf = malloc(sizeof(struct ipcam_search_msg) 
-				 + ((struct ipcam_search_msg *)buf)->exten_len);
-		parse_msg((const char *)buf, ret, msg_buf);
-		ipcam_deal_msg_func(msg_buf, &peer);
-
-		if (msg_buf) {
-			free(msg_buf);
-			msg_buf = NULL;
-		}
-	}
-	return NULL;
-}
-#endif
 
 static void recv_msg_from_pc(aeEventLoop *loop, int fd, void *privdata, int mask)
 {
@@ -241,7 +208,7 @@ static int send_heartbeat_msg(struct aeEventLoop *loop, long long id, void *clie
 
 static void release_exit(int signo)
 {
-   send_logout_msg();
+	send_logout_msg();
 
 	/*
 	 * release resources
@@ -355,7 +322,7 @@ int main(int argc, char **argv)
 
 	loop = aeCreateEventLoop();
 	aeCreateFileEvent(loop, IPCAM_SERVER_FD, AE_READABLE, recv_msg_from_pc, NULL);
-	aeCreateTimeEvent(loop, HEARTBEAT_CYCLE * 1000, send_heartbeat_msg, NULL, (void *)buf);
+	aeCreateTimeEvent(loop, HEARTBEAT_CYCLE * 1000, send_heartbeat_msg, (void *)buf, NULL);
 	aeMain(loop);
 
 	close_debug_log();
