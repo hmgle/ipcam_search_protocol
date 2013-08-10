@@ -349,6 +349,9 @@ static void dealcmd(aeEventLoop *loop, int fd, void *privdata, int mask)
 	curr_cmd = strtok(line_buf, ";");
 	if (curr_cmd) {
 		ret = run_cmd_by_string(loop, curr_cmd);
+	} else {
+		fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
+		fflush(stdout);
 	}
 
 	while ((curr_cmd = strtok(NULL, ";")) != NULL) {
