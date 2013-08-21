@@ -13,13 +13,7 @@ search ip cam on network.
 
 编译生成目标文件：
 
-### linux 平台：
+		make
 
-		make PLATFORM=linux
-
-
-### mingw 平台：
-
-		make PLATFORM=mingw
 
   生成的文件有： ipcam_search_pc, ipcam_search_device

@@ -1,28 +1,24 @@
-# mingw: make os=win
-# linux: make
-
-os =
 debug =
-PLATFORM = linux
+PLATFORM = $(shell uname -s)
 EXESUF =
 CFLAGS = -Wall -fno-strict-aliasing
 LIBS = -lpthread
 
 ifeq ($(PLATFORM),)
 $(info Please select your target platform by running one of the following commands:)
-$(info $(MAKE) PLATFORM=linux)
-$(info $(MAKE) PLATFORM=mingw)
+$(info $(MAKE) PLATFORM=Linux)
+$(info $(MAKE) PLATFORM=MINGW32_NT-5.1)
 $(error No PLATFORM given.)
 endif
 
-ifeq ($(PLATFORM), mingw)
+ifeq ($(PLATFORM), MINGW32_NT-5.1)
 	WINLIBS = -lws2_32 -liphlpapi
 	EXESUF = .exe
-else ifeq ($(PLATFORM), linux)
+else ifeq ($(PLATFORM), Linux)
 	WINLIBS =
 	CFLAGS += -D_LINUX_=1
 else
-$(error only for linux or mingw PLATFORM.)
+$(error only for Linux or mingw PLATFORM.)
 endif
 ifeq ($(debug), 1)
 	CFLAGS += -Wextra -O0 -DDEBUG=1 -g
