@@ -118,9 +118,9 @@ static int run_cmd_by_string(aeEventLoop *loop, char *cmd_string)
 		fflush(stdout);
 		break;
 	case 'q':
-		release_exit(0);
 		fprintf(stdout, "\033[01;32mipc_shell> \033[0m");
 		fflush(stdout);
+		release_exit(0);
 		break;
 	case 'h':
 	default:
@@ -171,7 +171,6 @@ static void release_exit(int signo)
 	 * release resources
 	 */
 	free_ipcam_link(IPCAM_DEV);
-
 	/*
 	 * exit
 	 */
