@@ -1,7 +1,7 @@
 #include <string.h>
 #include "ipcam_message.h"
 
-int parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg)
+void parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg)
 {
     int exten_len;
 
@@ -21,6 +21,4 @@ int parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg)
                ((struct ipcam_search_msg *)msg)->exten_msg, 
                exten_len);
     }
-
-    return 0;
 }

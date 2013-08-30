@@ -27,5 +27,5 @@ enum {
     IPCAMMSG_ACK_IP,
 } ipcam_search_msg_type;
 
-int parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg);
+void parse_msg(const char *msg, int size, struct ipcam_search_msg *save_msg);
 #endif
