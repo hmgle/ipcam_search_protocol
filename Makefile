@@ -4,13 +4,6 @@ EXESUF =
 CFLAGS = -Wall -fno-strict-aliasing
 LIBS = -lpthread
 
-ifeq ($(PLATFORM),)
-$(info Please select your target platform by running one of the following commands:)
-$(info $(MAKE) PLATFORM=Linux)
-$(info $(MAKE) PLATFORM=MINGW32_NT-5.1)
-$(error No PLATFORM given.)
-endif
-
 ifeq ($(PLATFORM), MINGW32_NT-5.1)
 	WINLIBS = -lws2_32 -liphlpapi
 	EXESUF = .exe
